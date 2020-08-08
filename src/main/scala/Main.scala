@@ -1,24 +1,33 @@
-import zio. { ZIO, App, console }
+import zio. { ZIO, App }
+import zio.console._
+import zio.clock._
+
+import zio.nio._
+import zio.nio.channels._
 
 import zio.nio.core._
-import zio.nio.core.channels._
 
 import zio.stream._
 
 
-object MyApp extends App {
+object Gateway extends App {
 
-  def run(args: List[String]) =
-    ZStream.managed(server(8080)).flatMap(handleDatagrams(_)).runDrain.orDie.exitCode
+  def run(args: List[String]) = 
+    ZStream.managed(server(8068)).flatMap(handleDatagrams(_)).runDrain.orDie.exitCode
 
-  def server(port: Int) =
-     for {
-      server        <- DatagramChannel.open.toManaged_
-      socketAddress <- SocketAddress.inetSocketAddress(port).asSome.toManaged_
-      _             <- server.bind(socketAddress).toManaged_
+  def server(port: Int) = {
+    for {
+      socketAddress <- SocketAddress.inetSocketAddress(port).option.toManaged_
+      server        <- DatagramChannel.bind(socketAddress)
     } yield server
+  } 
 
   def handleDatagrams(server: DatagramChannel) = 
-    ZStream.repeatEffect(Buffer.byte(128) >>= server.receive)
+    ZStream.repeatEffect {
+      for {
+        buffer <- Buffer.byte(65535)
+        _      <- server.receive(buffer)
+      } yield buffer
+    }
 
 }
