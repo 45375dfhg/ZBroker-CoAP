@@ -7,6 +7,7 @@ version := "0.1"
 libraryDependencies ++= Seq(
     "dev.zio" %% "zio" % "1.0.0",
     "dev.zio" %% "zio-streams" % "1.0.0",
-    "dev.zio" %% "zio-nio" % "1.0.0-RC9"
+    // "dev.zio" %% "zio-nio" % "1.0.0-RC9",
+    "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
 )
 
