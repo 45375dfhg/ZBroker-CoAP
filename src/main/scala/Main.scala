@@ -15,7 +15,7 @@ object Gateway extends App {
   def run(args: List[String]) = 
     ZStream.managed(server(8068)).flatMap(handleDatagrams(_))
       .zipWithIndex
-      .mapM(t => ZIO.when((t._2 + 1) % 20 == 0)(putStrLn((t._2 + 1).toString())))
+      .tap(t => ZIO.when((t._2 + 1) % 20 == 0)(putStrLn((t._2 + 1).toString())))
       .runDrain
       .orDie
       .exitCode
@@ -30,14 +30,11 @@ object Gateway extends App {
   def handleDatagrams(server: DatagramChannel) = 
     ZStream.repeatEffect {
       for {
-        buffer <- Buffer.byte(15)
+        buffer <- Buffer.byte(16)
         _      <- server.receive(buffer)
-      } yield buffer
-    }.mapM { buffer => 
-      for {
         _      <- buffer.flip
-        c      <- buffer.getChunk()
-      } yield ()     
+        chunk  <- buffer.getChunk()
+      } yield chunk
     }
 
 }
