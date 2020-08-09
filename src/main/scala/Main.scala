@@ -13,7 +13,12 @@ import zio.stream._
 object Gateway extends App {
 
   def run(args: List[String]) = 
-    ZStream.managed(server(8068)).flatMap(handleDatagrams(_)).runDrain.orDie.exitCode
+    ZStream.managed(server(8068)).flatMap(handleDatagrams(_))
+      .zipWithIndex
+      .mapM(t => ZIO.when((t._2 + 1) % 20 == 0)(putStrLn((t._2 + 1).toString())))
+      .runDrain
+      .orDie
+      .exitCode
 
   def server(port: Int) = {
     for {
@@ -21,13 +26,18 @@ object Gateway extends App {
       server        <- DatagramChannel.bind(socketAddress)
     } yield server
   } 
-
+  
   def handleDatagrams(server: DatagramChannel) = 
     ZStream.repeatEffect {
       for {
-        buffer <- Buffer.byte(65535)
+        buffer <- Buffer.byte(15)
         _      <- server.receive(buffer)
       } yield buffer
+    }.mapM { buffer => 
+      for {
+        _      <- buffer.flip
+        c      <- buffer.getChunk()
+      } yield ()     
     }
 
 }
