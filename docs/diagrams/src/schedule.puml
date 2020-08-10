@@ -1,0 +1,56 @@
+@startgantt gantt.png
+
+Project starts the 2020/09/07
+saturday are closed
+sunday are closed
+
+-- Statusmeldungen --
+[Status-Report 1]                        happens 21 days after start
+[Status-Report 2]                        happens 42 days after start
+[Status-Report 3]                        happens 63 days after start
+[Status-Report 4]                        happens 84 days after start
+
+-- Durchführung --
+[Anforderungsanalyse und Lit.-Recherche] lasts 10 days
+then [Präs. Anforderungsanalyse]         happens 14 days after start
+then [Impl. TypeClasses]                 lasts 3 days 
+then [Streams bis CoAP]                  lasts 4 days 
+then [Impl. CoAP Protocol Spez.]         lasts 5 days 
+then [CoAP bis WS mit Broker]            lasts 5 days 
+then [Impl. Unittests + Test]            lasts 3 days
+then [Impl. Komponententest + Test]      lasts 3 days
+then [Impl. Systemtest + Test]           lasts 5 days
+
+
+[Ziel der Arbeit, Rahmenbedingung]       lasts 5 days
+[Impl. abbilden u. begründen]            lasts 8 days
+[Diskussion u. Ausblick]                 lasts 6 days
+[Einleitung u. Abstract]                 lasts 3 days
+
+[Anforderungsanalyse und Lit.-Recherche] -> [Ziel der Arbeit, Rahmenbedingung]
+[CoAP bis WS mit Broker]                 -> [Impl. abbilden u. begründen]
+[Impl. abbilden u. begründen]            -> [Diskussion u. Ausblick]
+[Diskussion u. Ausblick]                 -> [Einleitung u. Abstract]              
+
+-- Endredaktion --
+then [Abgabe Draft]                      happens 73 days after start
+[Korrektur und fertigschreiben]          lasts 9 days
+[auf Feedback warten]                    lasts 5 days
+[Feedback einarbeiten]                   lasts 3 days
+[drucken und binden]                     lasts 1 day
+[Abgabe]                                 happens at 91 days after start
+
+[Abgabe Draft]                           -> [auf Feedback warten]
+[Abgabe Draft]                           -> [Korrektur und fertigschreiben]
+[auf Feedback warten]                    -> [Feedback einarbeiten]
+[Feedback einarbeiten]                   -> [drucken und binden]
+[Korrektur und fertigschreiben]          -> [drucken und binden]
+[drucken und binden]                     -> [Abgabe]
+
+[Anforderungsanalyse und Lit.-Recherche] is colored in lightblue
+[Korrektur und fertigschreiben]          is colored in lightblue
+[auf Feedback warten]                    is colored in lightblue
+[Feedback einarbeiten]                   is colored in lightblue
+[drucken und binden]                     is colored in lightblue
+
+@endgantt
