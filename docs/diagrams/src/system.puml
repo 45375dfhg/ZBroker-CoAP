@@ -1,0 +1,57 @@
+@startuml system
+
+rectangle edge {
+    component LocalCoAPServer
+    component SensorNoInternet
+    component SensorInternet
+    interface CoAP1
+    interface CoAP2
+} 
+
+rectangle gateway {
+    component UDPChannelStream 
+    queue     EffectStream
+    queue     ChunkStream
+    queue     CoAPPacketStream
+    queue     JSONStreams
+    component DBMSConnectorStream
+    component Broker
+    component WebSocketStream
+} 
+
+rectangle "possible DBMS" as DBMS
+
+rectangle "Common Operational Picture (Akka)" as COP
+rectangle "Operational Sub-Picture (Actors)" as OSP1
+rectangle "Operational Sub-Picture (Actors)" as OSP2
+
+actor user
+
+CoAP1 .down. UDPChannelStream : +unique sensor id
+CoAP2 .down. UDPChannelStream : +unique sensor id
+
+LocalCoAPServer .left. SensorNoInternet
+SensorInternet  .down. CoAP1
+LocalCoAPServer .down. CoAP2
+
+UDPChannelStream .down.> EffectStream : repeat receive forever
+EffectStream     .right.> ChunkStream : received buffer to chunk
+ChunkStream      .right.> CoAPPacketStream : chunk to packet
+CoAPPacketStream .right.> JSONStreams
+
+JSONStreams .right.> WebSocketStream
+JSONStreams <.> DBMSConnectorStream
+
+Broker <.down.> WebSocketStream : provide/store sub:clientID
+
+DBMSConnectorStream <..> DBMS
+
+OSP1 <..> WebSocketStream : enter sub/provide sub data
+OSP2 <..> WebSocketStream : send sensor commands
+
+user <...> COP
+COP  <..> WebSocketStream : admin/logging
+COP  <..> OSP1
+COP  <..> OSP2
+
+@enduml
