@@ -1,4 +1,4 @@
-import zio. { ZIO, App }
+import zio. { ZIO, App, ZEnv, ExitCode }
 import zio.console._
 import zio.clock._
 
@@ -9,16 +9,13 @@ import zio.nio.core._
 
 import zio.stream._
 
-
 object Gateway extends App {
-
-  def run(args: List[String]) = 
+  
+  val programm = 
     ZStream.managed(server(8068)).flatMap(handleDatagrams(_))
       .zipWithIndex
       .tap(t => ZIO.when((t._2 + 1) % 20 == 0)(putStrLn((t._2 + 1).toString())))
-      .runDrain
-      .orDie
-      .exitCode
+      .runDrain 
 
   def server(port: Int) = {
     for {
@@ -32,9 +29,12 @@ object Gateway extends App {
       for {
         buffer <- Buffer.byte(16)
         _      <- server.receive(buffer)
-        _      <- buffer.flip
-        chunk  <- buffer.getChunk()
+        fiber  <- (buffer.flip *> buffer.getChunk()).fork
+        chunk  <- fiber.join
       } yield chunk
     }
+
+  def run(args: List[String]) =
+    programm.orDie.exitCode
 
 }
