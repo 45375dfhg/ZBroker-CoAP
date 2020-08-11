@@ -9,17 +9,23 @@ rectangle edge {
 } 
 
 rectangle gateway {
+    rectangle STMBroker {
+        component "ID : IP"
+        component "ID : List[SUB]"
+    }
     component UDPChannelStream 
     queue     EffectStream
     queue     ChunkStream
-    queue     CoAPPacketStream
-    queue     JSONStreams
-    component DBMSConnectorStream
-    component Broker
+    queue     CoAPPacketStream as CPS1
+    queue     JSONStreams as JS1
+
+    queue     JSONStreams as JS2
+    queue     CoAPPacketStream as CPS2
+    queue     CoAPPacketQueue
+
     component WebSocketStream
 } 
 
-rectangle "possible DBMS" as DBMS
 
 rectangle "Common Operational Picture (Akka)" as COP
 rectangle "Operational Sub-Picture (Actors)" as OSP1
@@ -27,29 +33,31 @@ rectangle "Operational Sub-Picture (Actors)" as OSP2
 
 actor user
 
-CoAP1 .down. UDPChannelStream : +unique sensor id
-CoAP2 .down. UDPChannelStream : +unique sensor id
+CoAP1 .. UDPChannelStream : unique sensor id
+CoAP2 .. UDPChannelStream : unique sensor id
 
-LocalCoAPServer .left. SensorNoInternet
-SensorInternet  .down. CoAP1
-LocalCoAPServer .down. CoAP2
+LocalCoAPServer .. SensorNoInternet
+SensorInternet  .. CoAP1
+LocalCoAPServer .. CoAP2
 
-UDPChannelStream .down.> EffectStream : repeat receive forever
-EffectStream     .right.> ChunkStream : received buffer to chunk
-ChunkStream      .right.> CoAPPacketStream : chunk to packet
-CoAPPacketStream .right.> JSONStreams
+UDPChannelStream .down.>   EffectStream : repeat receive forever
+EffectStream     .right.>  ChunkStream : received buffer to chunk
+ChunkStream      .right.>  CPS1 : chunk to packet
+CPS1             .right.>  JS1
+JS1              .right.>  WebSocketStream
 
-JSONStreams .right.> WebSocketStream
-JSONStreams <.> DBMSConnectorStream
+WebSocketStream  .up.>     JS2
+JS2              .left.>   CPS2
+CPS2             .left.>   CoAPPacketQueue
+CoAPPacketQueue  .left.>   UDPChannelStream
 
-Broker <.down.> WebSocketStream : provide/store sub:clientID
+STMBroker        <.left.> WebSocketStream : id:sub
+UDPChannelStream .right.>   STMBroker : id:ip
 
-DBMSConnectorStream <..> DBMS
+OSP1 <.> WebSocketStream : enter sub/provide sub data
+OSP2 <.> WebSocketStream : send sensor commands
 
-OSP1 <..> WebSocketStream : enter sub/provide sub data
-OSP2 <..> WebSocketStream : send sensor commands
-
-user <...> COP
+user <..> COP
 COP  <..> WebSocketStream : admin/logging
 COP  <..> OSP1
 COP  <..> OSP2
