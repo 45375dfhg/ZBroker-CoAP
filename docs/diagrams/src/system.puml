@@ -4,8 +4,7 @@ rectangle edge {
     component LocalCoAPServer
     component SensorNoInternet
     component SensorInternet
-    interface CoAP1
-    interface CoAP2
+    interface CoAP
 } 
 
 rectangle gateway {
@@ -33,26 +32,27 @@ rectangle "Operational Sub-Picture (Actors)" as OSP2
 
 actor user
 
-CoAP1 .. UDPChannelStream : unique sensor id
-CoAP2 .. UDPChannelStream : unique sensor id
-
 LocalCoAPServer .. SensorNoInternet
-SensorInternet  .. CoAP1
-LocalCoAPServer .. CoAP2
+SensorInternet  .. CoAP
+LocalCoAPServer .. CoAP
 
-UDPChannelStream .down.>   EffectStream : repeat receive forever
-EffectStream     .right.>  ChunkStream : received buffer to chunk
-ChunkStream      .right.>  CPS1 : chunk to packet
-CPS1             .right.>  JS1
-JS1              .right.>  WebSocketStream
+CoAP .. UDPChannelStream : unique sensor id
+
+UDPChannelStream .down..>   EffectStream : repeat receive forever
+EffectStream     .right..>  ChunkStream : received buffer to chunk
+ChunkStream      .right..>  CPS1 : chunk to packet
+CPS1             .right..>  JS1
+JS1              .right..>  WebSocketStream
 
 WebSocketStream  .up.>     JS2
 JS2              .left.>   CPS2
 CPS2             .left.>   CoAPPacketQueue
 CoAPPacketQueue  .left.>   UDPChannelStream
 
-STMBroker        <.left.> WebSocketStream : id:sub
-UDPChannelStream .right.>   STMBroker : id:ip
+CPS1             .up..>     CPS2
+
+WebSocketStream <.up..>   STMBroker           : id:sub
+UDPChannelStream .right..>  STMBroker : id:ip
 
 OSP1 <.> WebSocketStream : enter sub/provide sub data
 OSP2 <.> WebSocketStream : send sensor commands
