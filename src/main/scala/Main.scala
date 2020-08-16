@@ -16,23 +16,18 @@ import zio.duration._
 
 object Gateway extends App {
 
-  def nioBlocking[A, C <: Channel](
-    channel: C
-  )(f: C => ZIO[zio.blocking.Blocking, Exception, A]): ZIO[zio.blocking.Blocking, Exception, A] =
-    f(channel).fork.flatMap(_.join).onInterrupt(channel.close.ignore)
+  class ExtendedChannel(channel: DatagramChannel) {
+    def receive_(dst: ByteBuffer) = channel.receive(dst).fork.flatMap(_.join).onInterrupt(channel.close.ignore)
+  }
+
+  implicit def extendDatagramChannel(channel: DatagramChannel) = new ExtendedChannel(channel)
   
   val routine =
     ZStream.fromEffect(for {
         server        <- DatagramChannel.open
-        socketAddress <- SocketAddress.inetSocketAddress(7040).option
+        socketAddress <- SocketAddress.inetSocketAddress(7075).option
         channel       <- server.bind(socketAddress)
     } yield channel)
-  
-  /* val routine = 
-    ZStream.managed(for {
-        socketAddress <- SocketAddress.inetSocketAddress(7049).option.toManaged_
-        channel       <- DatagramChannel.bind(socketAddress)
-    } yield channel) */
       
   def sender(stream: DatagramChannel) = 
     ZStream(stream).flatMap(sendDatamgrams(_)) //.tap(_ => putStrLn("SENDER"))
@@ -44,7 +39,7 @@ object Gateway extends App {
     ZStream.repeatEffect {
       for {
         buffer <- Buffer.byte(20)
-        res    <- nioBlocking(server)(_.receive(buffer))
+        res    <- server.receive_(buffer)
         _      <- buffer.flip
         chunk  <- buffer.getChunk()
       } yield chunk
@@ -63,18 +58,10 @@ object Gateway extends App {
   val programm = 
     (for {
       channel <- routine
-      send    =  sender(channel).drop(5).take(1)
-      rece    =  receiver(channel).drop(1000000).take(1)
+      send    =  sender(channel).take(1)
+      rece    =  receiver(channel).take(1)
       _       <- ZStream.mergeAll(2, 16)(send, rece)
     } yield()).runDrain
-  
-
-  /* val programm = (for {
-    a       <- routine
-    // _       <- receiver(a).drainFork(sender(a))
-    // _       <- receiver(a).merge(receiver(a)).merge(sender(a))
-    _       <- ZStream.mergeAllUnbounded(16)(receiver(a), sender(a))
-  } yield ()).runDrain */
 
   def run(args: List[String]) = {
     programm.tap(l => putStrLn(l.toString())).orDie.exitCode
