@@ -1,6 +1,5 @@
 import java.io.IOException
 import zio._
-import zio.clock.Clock
 import zio.{App, Schedule}
 import zio.console._
 import zio.nio.channels._
@@ -8,9 +7,6 @@ import zio.nio.core._
 import zio.stream._
 import zio.duration._
 import zio.Layer
-
-
-
 
 class Port private(val number: Int) extends AnyVal {}
 
@@ -23,9 +19,6 @@ object Port {
     Either.cond(1 to 65535 contains number, new Port(number), UnexpectedPortRangeException)
 
 }
-
-// TODO: Decide where to put this
-
 
 object ConfigRepository {
 
@@ -53,17 +46,13 @@ object ConfigRepositoryInMemory extends ConfigRepository.Service {
   def toLayer: Layer[Nothing, Has[ConfigRepository.Service]] = ZLayer.succeed(this)
 }
 
-//sealed trait Endpoint
-//case object WebSocketEndpoint extends Endpoint
-//case object DatagramEndpoint extends Endpoint
-
 /*
  * TODO: Wrapping this might be necessary to do proper apply() calls?
  */
-sealed trait Endpoint
+// sealed trait Endpoint
 // final case class WebSocketEndpoint extends Endpoint
-final case class DatagramEndpoint(channel: DatagramChannelWrapper) extends Endpoint
-class DatagramChannelWrapper(val underlying: DatagramChannel) extends AnyVal
+// final case class DatagramEndpoint(channel: DatagramChannelWrapper) extends Endpoint
+// class DatagramChannelWrapper(val underlying: DatagramChannel) extends AnyVal
 
 object EndpointRepository {
   import ConfigRepository.ConfigRepository
