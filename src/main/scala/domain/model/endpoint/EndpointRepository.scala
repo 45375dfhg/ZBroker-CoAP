@@ -11,9 +11,9 @@ object EndpointRepository {
   type EndpointRepository = Has[EndpointRepository.Service]
 
   trait Service {
-    val getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel]
+    def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel]
   }
 
-  lazy val getDatagramEndpoint: ZManaged[EndpointRepository with ConfigRepository, IOException, DatagramChannel] =
+  def getDatagramEndpoint: ZManaged[EndpointRepository with ConfigRepository, IOException, DatagramChannel] =
     ZManaged.accessManaged(_.get.getDatagramEndpoint)
 }

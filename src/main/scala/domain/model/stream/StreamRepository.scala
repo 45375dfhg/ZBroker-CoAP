@@ -3,20 +3,26 @@ package domain.model.stream
 import java.io.IOException
 
 import domain.model.config.ConfigRepository.ConfigRepository
-import domain.model.endpoint.EndpointRepository.EndpointRepository
-
+import zio.clock.Clock
+import zio.console.Console
 import zio.{Chunk, Has}
+import zio.nio.channels.DatagramChannel
 import zio.nio.core.SocketAddress
 import zio.stream.ZStream
 
 object StreamRepository {
 
-  type StreamRepository = Has[StreamRepository.Service] with EndpointRepository with ConfigRepository
+  type StreamRepository = Has[StreamRepository.Service]
 
   trait Service {
-    val getDatagramStream: ZStream[EndpointRepository with ConfigRepository, IOException, (Option[SocketAddress], Chunk[Byte])]
+    def getDatagramStream(c: DatagramChannel): ZStream[ConfigRepository, IOException, (Option[SocketAddress], Chunk[Byte])]
+    def sendDatagramStream(c: DatagramChannel): ZStream[ConfigRepository with Console with Clock, IOException, Int]
   }
 
-  lazy val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
-    ZStream.accessStream(_.get[StreamRepository.Service].getDatagramStream)
+  def getDatagramStream(c: DatagramChannel): ZStream[StreamRepository with ConfigRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
+    ZStream.accessStream(_.get.getDatagramStream(c))
+
+  def sendDatagramStream(c: DatagramChannel): ZStream[StreamRepository with ConfigRepository with Console with Clock, IOException, Int] =
+    ZStream.accessStream(_.get.sendDatagramStream(c))
+
 }

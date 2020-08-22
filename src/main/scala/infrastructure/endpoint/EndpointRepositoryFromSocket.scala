@@ -10,18 +10,17 @@ import zio._
 import zio.nio.channels._
 import zio.nio.core._
 
-object EndpointRepositoryInMemory extends EndpointRepository.Service {
+object EndpointRepositoryFromSocket extends EndpointRepository.Service {
 
-  private lazy val datagramChannel: ZManaged[ConfigRepository, IOException, DatagramChannel] =
+  private def datagramChannel: ZManaged[ConfigRepository, IOException, DatagramChannel] =
     for {
       port          <- ConfigRepository.getPrimaryUDPPort.toManaged_
       socketAddress <- SocketAddress.inetSocketAddress(port.number).option.toManaged_
       channel       <- DatagramChannel.bind(socketAddress)
     } yield channel
 
-  override lazy val getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
+  override def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
 
-  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] =
-    ZLayer.succeed(this)
+  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] = ZLayer.succeed(this)
 
 }
