@@ -1,4 +1,7 @@
 import java.io.IOException
+
+import EndpointRepository.EndpointRepository
+import StreamRepository.StreamRepository
 import zio._
 import zio.{App, Schedule}
 import zio.console._
@@ -20,30 +23,42 @@ object Port {
 
 }
 
+class BufferSize private(val value: Int) extends AnyVal {}
+
+sealed trait BufferSizeException extends IOException
+case object UnexpectedBufferSizeException extends BufferSizeException
+
+object BufferSize {
+
+  def apply(value: Int): Either[BufferSizeException, BufferSize] =
+    Either.cond(1 to 65535 contains value, new BufferSize(value), UnexpectedBufferSizeException)
+}
+
 object ConfigRepository {
 
   type ConfigRepository = Has[ConfigRepository.Service]
 
   trait Service {
-    def getPrimaryUDPPort: IO[PortRangeException, Port]
+    val getPrimaryUDPPort: IO[PortRangeException, Port]
+    val getBufferSize: IO[BufferSizeException, BufferSize]
   }
 
-  sealed trait ConfigFailure
-  object ConfigFailure {
-    final case class UnexpectedConfigFailure(err: Throwable) extends ConfigFailure
-  }
-
-  def getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
+  lazy val getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
     ZIO.accessM(_.get.getPrimaryUDPPort)
+
+  lazy val getBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
+    ZIO.accessM(_.get.getBufferSize)
 
 }
 
 object ConfigRepositoryInMemory extends ConfigRepository.Service {
 
   // TODO: Configure a proper fallback
-  override def getPrimaryUDPPort: IO[PortRangeException, Port] = ZIO.fromEither(Port(9997025).orElse(Port(7025)))
+  override lazy val getPrimaryUDPPort: IO[PortRangeException, Port] = ZIO.fromEither(Port(7025))
 
-  def toLayer: Layer[Nothing, Has[ConfigRepository.Service]] = ZLayer.succeed(this)
+  override lazy val getBufferSize: IO[BufferSizeException, BufferSize] = ZIO.fromEither(BufferSize(100))
+
+  def live: Layer[Nothing, Has[ConfigRepository.Service]] = ZLayer.succeed(this)
 }
 
 /*
@@ -57,50 +72,79 @@ object ConfigRepositoryInMemory extends ConfigRepository.Service {
 object EndpointRepository {
   import ConfigRepository.ConfigRepository
 
-  type EndpointRepository = Has[EndpointRepository.Service]
+  type EndpointRepository = Has[EndpointRepository.Service] with Has[ConfigRepository.Service]
 
   trait Service {
-    def createDatagramEndpoint: ZManaged[EndpointRepository with ConfigRepository, IOException, DatagramChannel]
+    def getDatagramEndpoint: ZManaged[EndpointRepository, IOException, DatagramChannel]
   }
 
-  def createDatagramEndpoint: ZManaged[EndpointRepository with ConfigRepository, IOException, DatagramChannel] =
-    ZManaged.accessManaged(_.get.createDatagramEndpoint)
+  def getDatagramEndpoint: ZManaged[EndpointRepository, IOException, DatagramChannel] =
+    ZManaged.accessManaged(_.get.getDatagramEndpoint)
 
 }
 
 object EndpointRepositoryInMemory extends EndpointRepository.Service {
   import ConfigRepository.ConfigRepository
 
-  private val datagramChannel: ZManaged[ConfigRepository, IOException, DatagramChannel] =
+  private lazy val datagramChannel: ZManaged[ConfigRepository, IOException, DatagramChannel] =
     for {
-    port          <- ConfigRepository.getPrimaryUDPPort.toManaged_
-    socketAddress <- SocketAddress.inetSocketAddress(port.number).option.toManaged_
-    channel       <- DatagramChannel.bind(socketAddress)
+      port          <- ConfigRepository.getPrimaryUDPPort.toManaged_
+      socketAddress <- SocketAddress.inetSocketAddress(port.number).option.toManaged_
+      channel       <- DatagramChannel.bind(socketAddress)
   } yield channel
 
-  override def createDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
+  override def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
 
-  def toLayer: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] = ZLayer.succeed(this)
+  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] = ZLayer.succeed(this)
+}
+
+object StreamRepository {
+  import EndpointRepository.EndpointRepository
+
+  type StreamRepository = Has[StreamRepository.Service] with EndpointRepository
+
+  trait Service {
+    val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])]
+  }
+
+  lazy val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
+    ZStream.accessStream(_.get.getDatagramStream)
+}
+
+object StreamRepositoryInMemory extends StreamRepository.Service {
+
+  def fetchDatagram(server: DatagramChannel) =
+    ZStream.repeatEffect {
+      (for {
+        size   <- ConfigRepository.getBufferSize
+        buffer <- Buffer.byte(size.value)
+        origin <- server.receive(buffer)
+        _      <- buffer.flip
+        chunk  <- buffer.getChunk()
+      } yield (origin, chunk)).refineToOrDie[IOException]
+    }
+
+  override lazy val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
+    ZStream.managed(EndpointRepository.getDatagramEndpoint).flatMap(fetchDatagram)
+
+  def live: ULayer[Has[StreamRepositoryInMemory.type]] = ZLayer.succeed(this)
 }
 
 object Application extends App {
 
   val program =
     (for {
-      udp  <- ZStream.managed(EndpointRepository.createDatagramEndpoint)
+      _    <- ZStream.fromEffect(putStrLn("booting up ..."))
+      udp  <- ZStream.managed(EndpointRepository.getDatagramEndpoint)
       send  = sender(udp).take(1)
       rece  = receiver(udp).take(1)
       _    <- ZStream.mergeAll(2, 16)(send, rece)
     } yield ()).runDrain
 
-  val layer = ConfigRepositoryInMemory.toLayer >+> EndpointRepositoryInMemory.toLayer
+  val layer = ConfigRepositoryInMemory.live >+> EndpointRepositoryInMemory.live
 
-  def run(args: List[String]): URIO[zio.ZEnv with Console, ExitCode] =
-    program
-      .tap(l => putStrLn(l.toString))
-      .provideCustomLayer(layer)
-      .orDie
-      .exitCode
+  def run(args: List[String]): URIO[ZEnv, ExitCode] =
+    program.tap(l => putStrLn(l.toString)).provideCustomLayer(layer).orDie.exitCode
 
   def sender(stream: DatagramChannel) =
     ZStream(stream).flatMap(sendDatamgrams)
