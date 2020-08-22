@@ -33,19 +33,6 @@ object Application extends App {
   def sender(stream: DatagramChannel) =
     ZStream(stream).flatMap(sendDatamgrams)
 
-  def receiver(stream: DatagramChannel) =
-    ZStream(stream).flatMap(handleDatagrams)
-
-  def handleDatagrams(server: DatagramChannel) =
-    ZStream.repeatEffect {
-      for {
-        buffer <- Buffer.byte(20)
-        a      <- server.receive(buffer)
-        _      <- buffer.flip
-        chunk  <- buffer.getChunk()
-      } yield chunk
-    }
-
   def sendDatamgrams(server: DatagramChannel) =
     ZStream.repeatEffectWith( {
       for {
