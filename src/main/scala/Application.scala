@@ -1,7 +1,5 @@
 import java.io.IOException
 
-import EndpointRepository.EndpointRepository
-import StreamRepository.StreamRepository
 import zio._
 import zio.{App, Schedule}
 import zio.console._
@@ -72,13 +70,13 @@ object ConfigRepositoryInMemory extends ConfigRepository.Service {
 object EndpointRepository {
   import ConfigRepository.ConfigRepository
 
-  type EndpointRepository = Has[EndpointRepository.Service] with Has[ConfigRepository.Service]
+  type EndpointRepository = Has[EndpointRepository.Service]
 
   trait Service {
-    def getDatagramEndpoint: ZManaged[EndpointRepository, IOException, DatagramChannel]
+    def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel]
   }
 
-  def getDatagramEndpoint: ZManaged[EndpointRepository, IOException, DatagramChannel] =
+  def getDatagramEndpoint: ZManaged[EndpointRepository with ConfigRepository, IOException, DatagramChannel] =
     ZManaged.accessManaged(_.get.getDatagramEndpoint)
 
 }
@@ -95,23 +93,28 @@ object EndpointRepositoryInMemory extends EndpointRepository.Service {
 
   override def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
 
-  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] = ZLayer.succeed(this)
+  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] =
+    ZLayer.succeed(this)
+
 }
 
 object StreamRepository {
   import EndpointRepository.EndpointRepository
+  import ConfigRepository.ConfigRepository
 
-  type StreamRepository = Has[StreamRepository.Service] with EndpointRepository
+  type StreamRepository = Has[StreamRepository.Service] with EndpointRepository with ConfigRepository
 
   trait Service {
-    val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])]
+    val getDatagramStream: ZStream[EndpointRepository with ConfigRepository, IOException, (Option[SocketAddress], Chunk[Byte])]
   }
 
   lazy val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
-    ZStream.accessStream(_.get.getDatagramStream)
+    ZStream.accessStream(_.get[StreamRepository.Service].getDatagramStream)
 }
 
 object StreamRepositoryInMemory extends StreamRepository.Service {
+  import EndpointRepository.EndpointRepository
+  import ConfigRepository.ConfigRepository
 
   def fetchDatagram(server: DatagramChannel) =
     ZStream.repeatEffect {
@@ -124,10 +127,10 @@ object StreamRepositoryInMemory extends StreamRepository.Service {
       } yield (origin, chunk)).refineToOrDie[IOException]
     }
 
-  override lazy val getDatagramStream: ZStream[StreamRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
+  override lazy val getDatagramStream: ZStream[EndpointRepository with ConfigRepository, IOException, (Option[SocketAddress], Chunk[Byte])] =
     ZStream.managed(EndpointRepository.getDatagramEndpoint).flatMap(fetchDatagram)
 
-  def live: ULayer[Has[StreamRepositoryInMemory.type]] = ZLayer.succeed(this)
+  def live: ZLayer[EndpointRepository, IOException, Has[StreamRepository.Service]] = ZLayer.succeed(this)
 }
 
 object Application extends App {
@@ -135,13 +138,16 @@ object Application extends App {
   val program =
     (for {
       _    <- ZStream.fromEffect(putStrLn("booting up ..."))
-      udp  <- ZStream.managed(EndpointRepository.getDatagramEndpoint)
-      send  = sender(udp).take(1)
-      rece  = receiver(udp).take(1)
-      _    <- ZStream.mergeAll(2, 16)(send, rece)
+      a    <- StreamRepository.getDatagramStream.take(1)
+      // udp  <- ZStream.managed(EndpointRepository.getDatagramEndpoint)
+      // send  = sender(udp).take(1)
+      // rece  = receiver(udp).take(1)
+      // _    <- ZStream.mergeAll(2, 16)(send, rece)
     } yield ()).runDrain
 
-  val layer = ConfigRepositoryInMemory.live >+> EndpointRepositoryInMemory.live
+  val layer = (ConfigRepositoryInMemory.live
+    >+> EndpointRepositoryInMemory.live
+    >+> StreamRepositoryInMemory.live)
 
   def run(args: List[String]): URIO[ZEnv, ExitCode] =
     program.tap(l => putStrLn(l.toString)).provideCustomLayer(layer).orDie.exitCode
