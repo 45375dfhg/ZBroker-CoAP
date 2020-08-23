@@ -17,6 +17,6 @@ object EndpointRepositoryFromSocket {
       channel       <- DatagramChannel.bind(socketAddress)
     } yield channel
 
-  val socketLayer = ZLayer.fromManaged(datagramChannel)
+  val live = ZLayer.fromManaged(datagramChannel)
 
 }
