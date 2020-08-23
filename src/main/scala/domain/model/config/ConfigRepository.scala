@@ -8,14 +8,14 @@ object ConfigRepository {
   type ConfigRepository = Has[ConfigRepository.Service]
 
   trait Service {
-    val getPrimaryUDPPort: IO[PortRangeException, Port]
-    val getBufferSize: IO[BufferSizeException, BufferSize]
+    def getPrimaryUDPPort: IO[PortRangeException, Port]
+    def getBufferSize: IO[BufferSizeException, BufferSize]
   }
 
-  lazy val getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
+  def getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
     ZIO.accessM(_.get.getPrimaryUDPPort)
 
-  lazy val getBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
+  def getBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
     ZIO.accessM(_.get.getBufferSize)
 
 }

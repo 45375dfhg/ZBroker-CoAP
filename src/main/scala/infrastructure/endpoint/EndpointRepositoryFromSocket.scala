@@ -5,7 +5,6 @@ import domain.model.config.ConfigRepository
 import domain.model.config.ConfigRepository.ConfigRepository
 import java.io.IOException
 
-
 import zio._
 import zio.nio.channels._
 import zio.nio.core._
@@ -19,8 +18,6 @@ object EndpointRepositoryFromSocket extends EndpointRepository.Service {
       channel       <- DatagramChannel.bind(socketAddress)
     } yield channel
 
-  override def getDatagramEndpoint: ZManaged[ConfigRepository, IOException, DatagramChannel] = datagramChannel
-
-  def live: ZLayer[ConfigRepository, IOException, Has[EndpointRepository.Service]] = ZLayer.succeed(this)
+  val live: ZLayer[ConfigRepository, IOException, Has[DatagramChannel]] = ZLayer.fromManaged(datagramChannel)
 
 }
