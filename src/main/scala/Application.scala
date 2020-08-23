@@ -1,4 +1,4 @@
-import infrastructure.stream.ChunkStreamFromSocket
+import infrastructure.stream.{ChunkStreamFromSocket, OutgoingStream}
 import domain.model.stream.ChunkStreamRepository
 import infrastructure.config.ConfigRepositoryInMemory
 import infrastructure.endpoint.EndpointRepositoryFromSocket
