@@ -11,7 +11,6 @@ libraryDependencies ++= Seq(
     "dev.zio" %% "zio-streams" % "1.0.0",
     "dev.zio" %% "zio-nio" % "1.0.0-RC9",
     "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
-    "dev.zio" %% "zio-config" % "1.0.0-RC26",
 )
 
 scalacOptions ++= Seq(
@@ -21,8 +20,6 @@ scalacOptions ++= Seq(
     "-deprecation",
     "-explaintypes", // Explain type errors in more detail
     "-language:higherKinds", // Allow higher-kinded types
-    "-Xfuture",
-    "-Yno-adapted-args",
     "-Ywarn-dead-code",
     "-Ywarn-numeric-widen",
     "-Ywarn-value-discard",
