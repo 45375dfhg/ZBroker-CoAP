@@ -14,3 +14,17 @@ libraryDependencies ++= Seq(
     "dev.zio" %% "zio-config" % "1.0.0-RC26",
 )
 
+scalacOptions ++= Seq(
+    "-target:jvm-1.11",
+    "-encoding", "UTF-8", // Specify character encoding used by source files.
+    "-unchecked", // Enable additional warnings where generated code depends on assumptions.
+    "-deprecation",
+    "-explaintypes", // Explain type errors in more detail
+    "-language:higherKinds", // Allow higher-kinded types
+    "-Xfuture",
+    "-Yno-adapted-args",
+    "-Ywarn-dead-code",
+    "-Ywarn-numeric-widen",
+    "-Ywarn-value-discard",
+    "-Ywarn-unused"
+)
