@@ -4,7 +4,7 @@ import java.io.IOException
 
 import domain.model.config.ConfigRepository.ConfigRepository
 
-import zio.nio.channels.DatagramChannel
+import zio.nio.core.channels.DatagramChannel
 import zio.{Chunk, Has}
 import zio.stream.ZStream
 

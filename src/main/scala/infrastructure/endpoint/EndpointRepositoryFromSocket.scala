@@ -5,18 +5,21 @@ import domain.model.config.ConfigRepository.ConfigRepository
 import java.io.IOException
 
 import zio._
-import zio.nio.channels._
+import zio.nio.core.channels._
 import zio.nio.core._
+import zio.blocking.Blocking
 
 object EndpointRepositoryFromSocket {
 
-  private val datagramChannel: ZManaged[ConfigRepository, IOException, DatagramChannel] =
-    for {
-      port          <- ConfigRepository.getPrimaryUDPPort.toManaged_
-      socketAddress <- SocketAddress.inetSocketAddress(port.number).option.toManaged_
-      channel       <- DatagramChannel.bind(socketAddress)
-    } yield channel
+  private val datagramChannel: ZIO[ConfigRepository, IOException, DatagramChannel] =
+    (for {
+      port          <- ConfigRepository.getPrimaryUDPPort
+      socketAddress <- SocketAddress.inetSocketAddress(port.number).option
+      server        <- DatagramChannel.open
+      channel       <- server.bind(socketAddress)
+    } yield channel).refineToOrDie[IOException]
 
-  val live = ZLayer.fromManaged(datagramChannel)
+  val live: ZLayer[ConfigRepository, IOException, Has[DatagramChannel]] =
+    ZLayer.fromAcquireRelease(datagramChannel)(channel => UIO(channel.close))
 
 }
