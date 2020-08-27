@@ -1,13 +1,82 @@
 import java.io.IOException
 
+import zio.Chunk
+
+import scala.annotation.tailrec
+
 //sealed trait Message
 //final case class CoapMessage(header: CoapHeader
 //                            // body: CoapBody
 //                            )
 final case class CoapMessage(header: CoapHeader)
 
-// raw header, raw body => header, raw body => header, body
+case object EmptyMessageException extends CoapMessageException
 
+object Coap {
+  def parse(in: Chunk[Boolean]): Either[CoapMessageException, Int] = {
+    @tailrec
+    def loop(rem: Chunk[Boolean], acc: Int = 0, power: Int = 0): Either[CoapMessageException, Int] =
+      rem.lastOption match {
+        case Some(bool) => if (bool) loop(rem.dropRight(1), acc + (1 << power), power + 1)
+                           else loop(rem.dropRight(1), acc, power + 1)
+        case None       => if (power == 0) Left(EmptyMessageException) else Right(acc)
+      }
+    loop(in)
+  }
+}
+sealed trait RawCoap {
+  def parse(in: Chunk[Boolean]): Either[CoapMessageException, Int] = {
+    @tailrec
+    def loop(rem: Chunk[Boolean], acc: Int = 0, power: Int = 0): Either[CoapMessageException, Int] =
+      rem.lastOption match {
+        case Some(bool) => if (bool) loop(rem.dropRight(1), acc + (1 << power), power + 1)
+        else loop(rem.dropRight(1), acc, power + 1)
+        case None       => if (power == 0) Left(EmptyMessageException) else Right(acc)
+      }
+    loop(in)
+  }
+
+  val headerBits: List[Int] = List(2, 2, 4, 3, 5, 16)
+}
+
+case object CoapConversionException extends CoapMessageException
+final case class RawHeader(data: Chunk[Boolean]) extends RawCoap { self =>
+  def toCoapHeader: Either[CoapMessageException, CoapHeader] = {
+    @tailrec
+    def parseBitsByOffsets(
+                           rem: Chunk[Boolean],
+                           acc: List[Either[CoapMessageException, Int]] = List.empty,
+                           offsets: List[Int] = headerBits): Either[CoapMessageException, List[Int]] = {
+      offsets.headOption match {
+        case Some(bitsN) => parse(rem.take(bitsN)) match {
+          case a @ Right(_) => parseBitsByOffsets(rem.drop(bitsN), a :: acc, offsets.tail)
+          case Left(_)      => Left(CoapConversionException)
+        }
+        case None        => if (acc.nonEmpty) acc.partitionMap(identity) match {
+                                case (Nil, rights) => Right(rights.reverse)
+                                case (lefts, _)    => Left(lefts.head)
+                              } else Left(CoapConversionException)
+      }
+    }
+    def constructHeaderFromInt(values: List[Int]): Either[CoapMessageException, CoapHeader] =
+      if (values.length == headerBits.length) {
+        for {
+          version    <- CoapVersion(values(0))
+          msgType    <- CoapType(values(1))
+          tLength    <- CoapTokenLength(values(2))
+          msgPreCode <- CodePrefix(values(3))
+          msgSufCode <- CodeSuffix(values(4))
+          msgId      <- CoapId(values(5))
+        } yield CoapHeader(version, msgType, tLength, msgPreCode, msgSufCode, msgId)
+      } else Left(CoapConversionException)
+    parseBitsByOffsets(data).flatMap(constructHeaderFromInt)
+  }
+}
+final case class RawBody(data: Chunk[Boolean]) {
+
+}
+
+// raw header, raw body => header, raw body => header, body
 
 sealed trait CoapMessageException extends IOException
 
@@ -58,16 +127,6 @@ object CoapId {
     // #rfc7252 accepts an unsigned 16-bit ID
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException)
 }
-
-val k =
-  for {
-    v <- CoapVersion(1)
-    t <- CoapType(2)
-    l <- CoapTokenLength(8)
-    p <- CodePrefix(5)
-    s <- CodeSuffix(31)
-    i <- CoapId(65500)
-  } yield CoapHeader(v,t,l,p,s,i)
 
 final case class CoapHeader(pVersion: CoapVersion,
                             mType: CoapType,

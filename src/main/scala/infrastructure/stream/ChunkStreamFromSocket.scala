@@ -26,7 +26,7 @@ object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
         origin <- server.receive(buffer)
         _      <- buffer.flip
         chunk  <- buffer.getChunk()
-        _      <- putStrLn(chunk.asBits.map(_.toString + " | ").mkString)
+        _      <- putStrLn(chunk.asBits.map(_.toString + ", ").mkString)
       } yield (origin, chunk.asBits)).refineToOrDie[IOException]
     }.provideSomeLayer[Has[DatagramChannel] with ConfigRepository](Console.live)
 
