@@ -1,19 +1,17 @@
 import java.io.IOException
 
-sealed trait Message
-final case class CoapMessage(header: CoapHeader,
-                            // body: CoapBody
-                            )
+//sealed trait Message
+//final case class CoapMessage(header: CoapHeader
+//                            // body: CoapBody
+//                            )
+final case class CoapMessage(header: CoapHeader)
 
-final case class CoapHeader(pVersion: CoapVersion,
-                            mType: CoapType,
-                            tLength: CoapTokenLength,
-                            mCode: CoapCode,
-                            mId: CoapId)
+// raw header, raw body => header, raw body => header, body
+
 
 sealed trait CoapMessageException extends IOException
 
-class CoapVersion private(val number: Int) extends AnyVal {}
+class CoapVersion private(val number: Int) extends AnyVal
 case object InvalidCoapVersionException extends CoapMessageException
 object CoapVersion {
   def apply(number: Int): Either[CoapMessageException, CoapVersion] =
@@ -53,13 +51,33 @@ object CodeSuffix {
     Either.cond(0 to 31 contains number, new CodeSuffix(number), InvalidCoapCodeException)
 }
 
-// 65536
 class CoapId private(val value: Int) extends AnyVal {}
 case object InvalidCoapIdException extends CoapMessageException
 object CoapId {
   def apply(value: Int): Either[CoapMessageException, CoapId] =
+    // #rfc7252 accepts an unsigned 16-bit ID
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException)
 }
+
+val k =
+  for {
+    v <- CoapVersion(1)
+    t <- CoapType(2)
+    l <- CoapTokenLength(8)
+    p <- CodePrefix(5)
+    s <- CodeSuffix(31)
+    i <- CoapId(65500)
+  } yield CoapHeader(v,t,l,p,s,i)
+
+final case class CoapHeader(pVersion: CoapVersion,
+                            mType: CoapType,
+                            tLength: CoapTokenLength,
+                            mPref: CodePrefix,
+                            mSuf: CodeSuffix,
+                            mId: CoapId)
+
+
+
 
 
 

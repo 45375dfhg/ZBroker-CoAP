@@ -6,18 +6,18 @@ import domain.model.config.ConfigRepository
 import domain.model.config.ConfigRepository.ConfigRepository
 import domain.model.stream.ChunkStreamRepository
 import domain.model.stream.ChunkStreamRepository.ChunkStreamRepository
-import infrastructure.config.ConfigRepositoryInMemory
-import infrastructure.endpoint.EndpointRepositoryFromSocket
-import zio.blocking.Blocking
+
 import zio.{Chunk, Has, ZIO, ZLayer}
-import zio.nio.core.channels.{Channel, DatagramChannel}
+import zio.nio.core.channels.DatagramChannel
 import zio.nio.core.{Buffer, SocketAddress}
 import zio.stream.ZStream
+import zio.console._
 
 
 object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
 
-  override def getStream: ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Option[SocketAddress], Chunk[Byte])] =
+  override def getStream:
+  ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Option[SocketAddress], Chunk[Boolean])] =
     ZStream.repeatEffect {
       (for {
         size   <- ConfigRepository.getBufferSize
@@ -26,8 +26,9 @@ object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
         origin <- server.receive(buffer)
         _      <- buffer.flip
         chunk  <- buffer.getChunk()
-      } yield (origin, chunk)).refineToOrDie[IOException]
-    }
+        _      <- putStrLn(chunk.asBits.map(_.toString + " | ").mkString)
+      } yield (origin, chunk.asBits)).refineToOrDie[IOException]
+    }.provideSomeLayer[Has[DatagramChannel] with ConfigRepository](Console.live)
 
   val live: ZLayer[Any, IOException, ChunkStreamRepository] = ZLayer.succeed(this)
 }
