@@ -4,7 +4,7 @@ name := "gateway"
 organization := "de.hsma.scala"
 version := "0.1"
 
-// run / fork := true
+run / fork := true
 
 libraryDependencies ++= Seq(
     "dev.zio" %% "zio" % "1.0.1",
