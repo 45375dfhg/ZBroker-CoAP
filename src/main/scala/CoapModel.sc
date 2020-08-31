@@ -13,12 +13,6 @@ final case class CoapHeader(pVersion: CoapVersion,
                             mSuf: CodeSuffix,
                             mId: CoapId)
 
-object CoapHeader {
-  def apply(list: List[CoapHeaderParameter]) = {
-    val test = list.head
-  }
-
-}
 
 // raw head => head => raw body => body => message
 
@@ -28,39 +22,37 @@ object CoapHeader {
 
 case object EmptyMessageException extends CoapMessageException
 
-sealed trait RawCoap {
+sealed trait Coap {
   def parse(in: Chunk[Boolean]): Either[CoapMessageException, Int] = {
     @tailrec
     def loop(rem: Chunk[Boolean], acc: Int = 0, power: Int = 0): Either[CoapMessageException, Int] =
       rem.lastOption match {
         case Some(bool) => if (bool) loop(rem.dropRight(1), acc + (1 << power), power + 1)
-        else loop(rem.dropRight(1), acc, power + 1)
+                           else loop(rem.dropRight(1), acc, power + 1)
         case None       => if (power == 0) Left(EmptyMessageException) else Right(acc)
       }
     loop(in)
   }
-
-  val headerBits = List(("version", 2), ("type", 2), ("length", 4), ("prefix", 3), ("suffix", 5), ("id", 16))
 }
 
 case object CoapConversionException extends CoapMessageException
 
-final case class RawHeader(data: Chunk[Boolean]) extends RawCoap { self =>
-  def toCoapHeader: Either[CoapMessageException, CoapHeader] = {
+case object CoapHeader extends Coap {
+  def fromChunk(data: Chunk[Boolean]): Either[CoapMessageException, CoapHeader] = {
     @tailrec
     def parseBitsByOffsets(
-                           rem: Chunk[Boolean],
-                           acc: List[Either[CoapMessageException, (String, Int)]] = List.empty,
-                           offsets: List[(String, Int)] = headerBits): Either[CoapMessageException, Map[String, Int]] = {
+                            rem: Chunk[Boolean],
+                            acc: List[Either[CoapMessageException, (String, Int)]] = List.empty,
+                            offsets: List[(String, Int)] = headerBits): Either[CoapMessageException, Map[String, Int]] = {
       offsets.headOption match {
         case Some((key, bitsN)) => parse(rem.take(bitsN)) match {
-            case r @ Right(_) => parseBitsByOffsets(rem.drop(bitsN), r.map((key, _)) :: acc, offsets.tail)
-            case Left(_)      => Left(CoapConversionException)
-          }
-        case None        => if (acc.nonEmpty) acc.partitionMap(identity) match {
-                                case (Nil, rights) => Right(rights.toMap)
-                                case (lefts, _)    => Left(lefts.head)
-                            } else Left(CoapConversionException)
+          case r @ Right(_) => parseBitsByOffsets(rem.drop(bitsN), r.map((key, _)) :: acc, offsets.tail)
+          case Left(_)      => Left(CoapConversionException)
+        }
+        case None               => if (acc.nonEmpty) acc.partitionMap(identity) match {
+          case (Nil, rights) => Right(rights.toMap)
+          case (lefts, _)    => Left(lefts.head)
+        } else Left(CoapConversionException)
 
       }
     }
@@ -77,9 +69,11 @@ final case class RawHeader(data: Chunk[Boolean]) extends RawCoap { self =>
         // msgCode    <- Right(CoapCode(msgPreCode, msgSufCode))
       } yield CoapHeader(version, msgType, tLength, msgPreCode, msgSufCode, msgId)
     }
-    
+
     parseBitsByOffsets(data).flatMap(constructHeaderFromInt)
   }
+
+  private val headerBits = List(("version", 2), ("type", 2), ("length", 4), ("prefix", 3), ("suffix", 5), ("id", 16))
 }
 
 sealed trait CoapMessageException extends IOException
@@ -139,6 +133,10 @@ final case class RawBody(data: Chunk[Boolean], tLength: CoapTokenLength) { self 
 
 }
 
+CoapHeader.fromChunk(Chunk(true))
+// raw header and body useless
+// instead CoapHeader.fromChunk() & CoapBody.fromChunk
+
 // 1. extract token if necessary
 // 2. skim rest for possible option ends
 // 3. check for eof / payload marker
@@ -147,6 +145,14 @@ final case class RawBody(data: Chunk[Boolean], tLength: CoapTokenLength) { self 
 // => parallel processing very limited
 
 // Token, Options, Payload
+
+// 1. receive chunk
+// 2. split chunk into header and body | fail if header too small
+// 3. read raw header => coap header
+// 4. use coap header values to read raw body => coap body
+// 5. return both
+
+// translation layer for mappings?
 
 
 
