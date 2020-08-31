@@ -50,9 +50,9 @@ case object CoapHeader extends Coap {
           case Left(_)      => Left(CoapConversionException)
         }
         case None               => if (acc.nonEmpty) acc.partitionMap(identity) match {
-          case (Nil, rights) => Right(rights.toMap)
-          case (lefts, _)    => Left(lefts.head)
-        } else Left(CoapConversionException)
+                                      case (Nil, rights) => Right(rights.toMap)
+                                      case (lefts, _)    => Left(lefts.head)
+                                   } else Left(CoapConversionException)
 
       }
     }
@@ -128,12 +128,34 @@ object CoapId extends CoapHeaderParameter {
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException)
 }
 
-final case class RawBody(data: Chunk[Boolean], tLength: CoapTokenLength) { self =>
-  def toCoapBody = ???
+case object CoapBody extends Coap {
+  def fromChunkAndHeader(chunk: Chunk[Boolean])(header: CoapHeader) = {
+    // utility functions to work with or around the token
+    def extractToken: Chunk[Boolean] = chunk.take(header.tLength.value) // TODO: Parsing?!
+    def dropToken: Chunk[Boolean]    = chunk.drop(header.tLength.value)
 
+    def detectPayloadMarker(marker: Chunk[Boolean]) = marker.forall(_ == true)
+    def detectOption = ???
+  }
 }
 
-CoapHeader.fromChunk(Chunk(true))
+class OptionDelta private(val value: Int) extends AnyVal {}
+case object InvalidOptionDelta extends CoapMessageException
+object OptionDelta {
+  def apply(value: Int): Either[CoapMessageException, OptionDelta] =
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    Either.cond(0 to 14 contains value, new OptionDelta(value), InvalidOptionDelta)
+}
+
+class OptionLength private(val value: Int) extends AnyVal {}
+case object InvalidOptionLength extends CoapMessageException
+object OptionLength {
+  def apply(value: Int): Either[CoapMessageException, OptionLength] =
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for future use, must be processed as format error
+    Either.cond(0 to 14 contains value, new OptionLength(value), InvalidOptionLength)
+}
+
+
 // raw header and body useless
 // instead CoapHeader.fromChunk() & CoapBody.fromChunk
 
