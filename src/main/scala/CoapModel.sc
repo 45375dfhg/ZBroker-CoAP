@@ -16,10 +16,6 @@ final case class CoapHeader(pVersion: CoapVersion,
 
 // raw head => head => raw body => body => message
 
-//final case class CoapBody(tValue: CoapToken,
-//                          options: CoapOptions,
-//                          payload: CoapPayload)
-
 case object EmptyMessageException extends CoapMessageException
 
 sealed trait Coap {
@@ -128,23 +124,21 @@ object CoapId extends CoapHeaderParameter {
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException)
 }
 
-case object CoapBody extends Coap {
-  def fromChunkAndHeader(chunk: Chunk[Boolean])(header: CoapHeader) = {
-    // utility functions to work with or around the token
-    def extractToken: Chunk[Boolean] = chunk.take(header.tLength.value) // TODO: Parsing?!
-    def dropToken: Chunk[Boolean]    = chunk.drop(header.tLength.value)
-
-    def detectPayloadMarker(marker: Chunk[Boolean]) = marker.forall(_ == true)
-    def detectOption = ???
-  }
-}
-
 class OptionDelta private(val value: Int) extends AnyVal {}
 case object InvalidOptionDelta extends CoapMessageException
 object OptionDelta {
   def apply(value: Int): Either[CoapMessageException, OptionDelta] =
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 14 contains value, new OptionDelta(value), InvalidOptionDelta)
+
+  def ext8(value: Int): Either[CoapMessageException, OptionDelta] =
+    // #rfc7252 maps 13 to a new byte which value is subtracted by 13
+    Either.cond(13 to 268 contains value, new OptionDelta(value), InvalidOptionDelta)
+
+  def ext16(value: Int): Either[CoapMessageException, OptionDelta] =
+    // #rfc7252 maps 14 to two bytes which value is subtracted by 269
+    Either.cond(269 to 65804 contains value, new OptionDelta(value), InvalidOptionDelta)
 }
 
 class OptionLength private(val value: Int) extends AnyVal {}
@@ -152,19 +146,72 @@ case object InvalidOptionLength extends CoapMessageException
 object OptionLength {
   def apply(value: Int): Either[CoapMessageException, OptionLength] =
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for future use, must be processed as format error
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 14 contains value, new OptionLength(value), InvalidOptionLength)
+
+  def ext8(value: Int): Either[CoapMessageException, OptionLength] =
+    // #rfc7252 maps 13 to a new byte which value is subtracted by 13
+    Either.cond(13 to 268 contains value, new OptionLength(value), InvalidOptionLength)
+
+  def ext16(value: Int): Either[CoapMessageException, OptionLength] =
+    // #rfc7252 maps 14 to two bytes which value is subtracted by 269
+    Either.cond(269 to 65804 contains value, new OptionLength(value), InvalidOptionLength)
 }
 
 
-// raw header and body useless
-// instead CoapHeader.fromChunk() & CoapBody.fromChunk
+
+// TODO: Refactor - is the extension required? what about empty and unchanged?
+final case class OptionValue(value: Chunk[Boolean]) extends Coap { self =>
+  def asEmpty: Unit = ???
+  def asString = ??? // bit shifting :)
+  def asUnsignedInt = ??? // parsed
+  def unchanged = self
+}
+
+final case class CoapBody(token: CoapToken,
+                          options: List[CoapOption],
+                          payload: CoapPayload)
+
+final case class CoapOption(delta: OptionDelta, length: OptionLength, value: OptionValue)
+
+// TODO: Refactor
+class CoapToken (val value: Int) extends AnyVal {}
+class CoapPayload (val value: Int) extends AnyVal {}
+
+case object CoapBody extends Coap {
+  def fromChunkAndHeader(chunk: Chunk[Boolean])(header: CoapHeader) = {
+    // utility functions to work with or around the token
+    def extractToken: Chunk[Boolean] = chunk.take(header.tLength.value) // TODO: Parsing?!
+    def dropToken: Chunk[Boolean]    = chunk.drop(header.tLength.value)
+
+    def detectPayloadMarker(marker: Chunk[Boolean]) = marker.forall(_ == true)
+
+    def parseOption() = ???
+
+    // NON LOOP
+    // Extract Token
+
+    // LOOP
+    // 1. detect payload marker -> if found end parse payload end loop
+    // 2. Check Delta and Length for > 12 branch and read all three parts depending on results
+    // ! Option Parsing is the "true" loop
+  }
+}
+
+val t: Chunk[Byte] = Chunk()
+
 
 // 1. extract token if necessary
-// 2. skim rest for possible option ends
-// 3. check for eof / payload marker
+// 2. check for eof then payload then option else error
 // marker only exists if payload is non-zero
-// ! marker value can be inside option length etc so scanning not recommended
-// => parallel processing very limited
+
+// Read Option
+// 1  Check Delta for > 12
+// 2  Check Length for > 12
+// 3  if (1) read 8 or 16 bits after first byte
+// 4  if (2) read 0 or 8 or 16 bits (depended on 1) after first byte
+// 5  read 4 bits after 0 or 8 or 16 or 24 or 32 bits after first byte
+
 
 // Token, Options, Payload
 
