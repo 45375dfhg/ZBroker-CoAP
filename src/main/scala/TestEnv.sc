@@ -6,84 +6,78 @@ import scala.annotation.tailrec
 
 final case class CoapMessage(header: CoapHeader)
 
-final case class CoapHeader(pVersion: CoapVersion,
-                            mType: CoapType,
-                            tLength: CoapTokenLength,
-                            mPref: CodePrefix,
-                            mSuf: CodeSuffix,
-                            mId: CoapId)
-
-
-// raw head => head => raw body => body => message
+final case class CoapHeader(
+  pVersion: CoapVersion,
+  mType: CoapType,
+  tLength: CoapTokenLength,
+  mPref: CodePrefix,
+  mSuf: CodeSuffix,
+  mId: CoapId
+)
 
 case object EmptyMessageException extends CoapMessageException
 
-sealed trait Coap {
-  def parse(in: Chunk[Boolean]): Either[CoapMessageException, Int] = {
+sealed trait Coap { self =>
+  def parse(in: Chunk[Boolean]): Int = {
     @tailrec
-    def loop(rem: Chunk[Boolean], acc: Int = 0, power: Int = 0): Either[CoapMessageException, Int] =
+    def loop(rem: Chunk[Boolean], acc: Int = 0, power: Int = 0): Int =
       rem.lastOption match {
         case Some(bool) => if (bool) loop(rem.dropRight(1), acc + (1 << power), power + 1)
-                           else loop(rem.dropRight(1), acc, power + 1)
-        case None       => if (power == 0) Left(EmptyMessageException) else Right(acc)
+        else loop(rem.dropRight(1), acc, power + 1)
+        case None       => acc
       }
     loop(in)
   }
 }
 
-case object CoapConversionException extends CoapMessageException
+case object InvalidChunkSizeException extends CoapMessageException
 
-// TODO: Rewrite so errors get accumulated and no error short circuiting
-// TODO: Rewrite - right now take() can take less than bitsN elements without failing
+// TODO: Error Management ill-placed? Instead throw exception when can't pass 32 bits!
 case object CoapHeader extends Coap {
+  private val headerBits = List(("version", 2), ("type", 2), ("length", 4), ("prefix", 3), ("suffix", 5), ("id", 16))
+
   def fromChunk(data: Chunk[Boolean]): Either[CoapMessageException, CoapHeader] = {
     @tailrec
     def parseBitsByOffsets(
       rem: Chunk[Boolean],
-      acc: List[Either[CoapMessageException, (String, Int)]] = List.empty,
+      acc: List[(String, Int)] = List.empty,
       offsets: List[(String, Int)] = headerBits
-    ): Either[CoapMessageException, Map[String, Int]] = {
+    ): Map[String, Int] =
       offsets.headOption match {
-        case Some((key, bitsN)) => parse(rem.take(bitsN)) match {
-          case r @ Right(_) => parseBitsByOffsets(rem.drop(bitsN), r.map((key, _)) :: acc, offsets.tail)
-          case Left(_)      => Left(CoapConversionException)
-        }
-        case None               => if (acc.nonEmpty) acc.partitionMap(identity) match {
-          case (Nil, rights) => Right(rights.toMap)
-          case (lefts, _)    => Left(lefts.head)
-        } else Left(CoapConversionException)
+        case Some((k, n)) => parseBitsByOffsets(rem.drop(n), k -> parse(rem.take(n)) :: acc, offsets.tail)
+        case None         => acc.toMap
       }
-    }
 
-    def constructHeaderFromInt(m: Map[String, Int]): Either[CoapMessageException, CoapHeader] = {
-      def getAsEither(s: String): Either[CoapConversionException.type, Int] = m.get(s).toRight(CoapConversionException)
+    // java.util.NoSuchElementException should not be possible
+    def constructHeader(m: Map[String, Int]): Either[CoapMessageException, CoapHeader] =
+      (for {
+        version    <- CoapVersion(m("version"))
+        msgType    <- CoapType(m("type"))
+        tLength    <- CoapTokenLength(m("length"))
+        msgPreCode <- CodePrefix(m("prefix"))
+        msgSufCode <- CodeSuffix(m("suffix"))
+        msgId      <- CoapId(m("id"))
+      } yield CoapHeader(version, msgType, tLength, msgPreCode, msgSufCode, msgId))
 
-      for {
-        version    <- getAsEither("version").flatMap(CoapVersion(_))
-        msgType    <- getAsEither("type").flatMap(CoapType(_))
-        tLength    <- getAsEither("length").flatMap(CoapTokenLength(_))
-        msgPreCode <- getAsEither("prefix").flatMap(CodePrefix(_))
-        msgSufCode <- getAsEither("suffix").flatMap(CodeSuffix(_))
-        msgId      <- getAsEither("id").flatMap(CoapId(_))
-        // msgCode    <- Right(CoapCode(msgPreCode, msgSufCode))
-      } yield CoapHeader(version, msgType, tLength, msgPreCode, msgSufCode, msgId)
-    }
-
-    parseBitsByOffsets(data).flatMap(constructHeaderFromInt)
+    if (data.lengthCompare(32) == 0) (constructHeader _)(parseBitsByOffsets(data))
+    else Left(InvalidChunkSizeException)
   }
 
-  private val headerBits = List(("version", 2), ("type", 2), ("length", 4), ("prefix", 3), ("suffix", 5), ("id", 16))
+
 }
 
 sealed trait CoapMessageException extends IOException
 
-sealed trait CoapHeaderParameter
+sealed trait CoapHeaderParameter {
+  val bitSize: Int
+}
 
 class CoapVersion private(val number: Int) extends AnyVal
 case object InvalidCoapVersionException extends CoapMessageException
 object CoapVersion extends CoapHeaderParameter {
+  val bitSize = 2
   def apply(number: Int): Either[CoapMessageException, CoapVersion] =
-    // #rfc7252 knows only one valid protocol version
+  // #rfc7252 knows only one valid protocol version
     Either.cond(1 to 1 contains number, new CoapVersion(1), InvalidCoapVersionException)
 }
 
@@ -91,7 +85,7 @@ class CoapType private(val number: Int) extends AnyVal {}
 case object InvalidCoapTypeException extends CoapMessageException
 object CoapType extends CoapHeaderParameter {
   def apply(number: Int): Either[CoapMessageException, CoapType] =
-    // #rfc7252 accepts 4 different types in a 2-bit window
+  // #rfc7252 accepts 4 different types in a 2-bit window
     Either.cond(0 to 3 contains number, new CoapType(number), InvalidCoapTypeException)
 }
 
@@ -99,7 +93,7 @@ class CoapTokenLength private(val value: Int) extends AnyVal {}
 case object InvalidCoapTokenLengthException extends CoapMessageException
 object CoapTokenLength extends CoapHeaderParameter {
   def apply(value: Int): Either[CoapMessageException, CoapTokenLength] =
-    // #rfc7252 accepts a length of 0 to 8 in a 4-bit window, 9 to 15 are reserved
+  // #rfc7252 accepts a length of 0 to 8 in a 4-bit window, 9 to 15 are reserved
     Either.cond(0 to 8 contains value, new CoapTokenLength(value), InvalidCoapTokenLengthException)
 }
 
@@ -109,13 +103,13 @@ case object InvalidCoapCodeException extends CoapMessageException
 class CodePrefix private(val number: Int) extends AnyVal {}
 object CodePrefix extends CoapHeaderParameter {
   def apply(number: Int): Either[CoapMessageException, CodePrefix] =
-    // #rfc7252 accepts prefix codes between 0 to 7 in a 3-bit window
+  // #rfc7252 accepts prefix codes between 0 to 7 in a 3-bit window
     Either.cond(0 to 7 contains number, new CodePrefix(number), InvalidCoapCodeException)
 }
 class CodeSuffix private(val number: Int) extends AnyVal {}
 object CodeSuffix extends CoapHeaderParameter {
   def apply(number: Int): Either[CoapMessageException, CodeSuffix] =
-    // #rfc7252 accepts suffix codes between 0 to 31 in a 5-bit window
+  // #rfc7252 accepts suffix codes between 0 to 31 in a 5-bit window
     Either.cond(0 to 31 contains number, new CodeSuffix(number), InvalidCoapCodeException)
 }
 
@@ -123,7 +117,7 @@ class CoapId private(val value: Int) extends AnyVal {}
 case object InvalidCoapIdException extends CoapMessageException
 object CoapId extends CoapHeaderParameter {
   def apply(value: Int): Either[CoapMessageException, CoapId] =
-    // #rfc7252 accepts an unsigned 16-bit ID
+  // #rfc7252 accepts an unsigned 16-bit ID
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException)
 }
 
@@ -140,19 +134,19 @@ final case class OptionDeltaExt16(value: Int) extends OptionDelta
 
 object OptionDeltaNorm {
   def apply(value: Int): Either[CoapMessageException, OptionDelta] =
-    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-    // ... while 13 and 14 lead to special constructs via ext8 and ext16
+  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+  // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 14 contains value, new OptionDeltaNorm(value), InvalidOptionDelta)
 }
 object OptionDeltaExt8 {
   def apply(value: Int): Either[CoapMessageException, OptionDelta] =
-    // #rfc7252 maps 13 to a new byte which represents the delta minus 13
+  // #rfc7252 maps 13 to a new byte which represents the delta minus 13
     Either.cond(13 to 268 contains value, new OptionDeltaExt8(value), InvalidOptionDelta)
 }
 
 object OptionDeltaExt16 {
   def apply(value: Int): Either[CoapMessageException, OptionDelta] =
-    // #rfc7252 maps 14 to two bytes which represents the delta minus 269
+  // #rfc7252 maps 14 to two bytes which represents the delta minus 269
     Either.cond(269 to 65804 contains value, new OptionDeltaExt16(value), InvalidOptionDelta)
 }
 
@@ -160,16 +154,16 @@ class OptionLength private(val value: Int) extends AnyVal {}
 case object InvalidOptionLength extends CoapMessageException
 object OptionLength {
   def apply(value: Int): Either[CoapMessageException, OptionLength] =
-    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for future use, must be processed as format error
-    // ... while 13 and 14 lead to special constructs via ext8 and ext16
+  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for future use, must be processed as format error
+  // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 14 contains value, new OptionLength(value), InvalidOptionLength)
 
   def ext8(value: Int): Either[CoapMessageException, OptionLength] =
-    // #rfc7252 maps 13 to a new byte which represents the length minus 13
+  // #rfc7252 maps 13 to a new byte which represents the length minus 13
     Either.cond(13 to 268 contains value, new OptionLength(value), InvalidOptionLength)
 
   def ext16(value: Int): Either[CoapMessageException, OptionLength] =
-    // #rfc7252 maps 14 to two bytes which represents the length minus 269
+  // #rfc7252 maps 14 to two bytes which represents the length minus 269
     Either.cond(269 to 65804 contains value, new OptionLength(value), InvalidOptionLength)
 }
 
@@ -184,8 +178,8 @@ final case class OptionValue(value: Chunk[Boolean]) extends Coap { self =>
 }
 
 final case class CoapBody(token: CoapToken,
-                          options: List[CoapOption],
-                          payload: CoapPayload)
+  options: List[CoapOption],
+  payload: CoapPayload)
 
 final case class CoapOption(delta: OptionDelta, length: OptionLength, value: OptionValue)
 
@@ -220,11 +214,11 @@ case object CoapBody extends Coap {
 
 
 
-//        val extLength = length.flatMap {
-//          case 13    => parse(rem.slice(8, 16)).flatMap(OptionDelta.ext8)
-//          case 14    => parse(rem.slice(8, 32)).flatMap(OptionDelta.ext16)
-//          case other => OptionLength(other)
-//        }
+        //        val extLength = length.flatMap {
+        //          case 13    => parse(rem.slice(8, 16)).flatMap(OptionDelta.ext8)
+        //          case 14    => parse(rem.slice(8, 32)).flatMap(OptionDelta.ext16)
+        //          case other => OptionLength(other)
+        //        }
       }
     }
 
@@ -244,6 +238,7 @@ import zio.stream._
 val k = Chunk(true, false)
 val t = CoapHeader.fromChunk(k)
 val r = ZStream(k).mapM(chunk => ZIO.fromEither(CoapHeader.fromChunk(chunk)))
+
 
 // 1. extract token if necessary
 // 2. check for eof then payload then option else error
