@@ -17,7 +17,7 @@ import zio.console._
 object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
 
   override def getStream:
-  ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Option[SocketAddress], Chunk[Boolean])] =
+  ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Option[SocketAddress], Chunk[Byte])] =
     ZStream.repeatEffect {
       (for {
         size   <- ConfigRepository.getBufferSize
@@ -27,7 +27,7 @@ object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
         _      <- buffer.flip
         chunk  <- buffer.getChunk()
         _      <- putStrLn(chunk.asBits.map(_.toString + ", ").mkString)
-      } yield (origin, chunk.asBits)).refineToOrDie[IOException]
+      } yield (origin, chunk)).refineToOrDie[IOException]
     }.provideSomeLayer[Has[DatagramChannel] with ConfigRepository](Console.live)
 
   val live: ZLayer[Any, IOException, ChunkStreamRepository] = ZLayer.succeed(this)

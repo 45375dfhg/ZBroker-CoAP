@@ -13,9 +13,9 @@ object ChunkStreamRepository {
   type ChunkStreamRepository = Has[ChunkStreamRepository.Service]
 
   trait Service {
-    def getStream: ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Any, Chunk[Boolean])]
+    def getStream: ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Any, Chunk[Byte])]
   }
 
-  def getStream: ZStream[ChunkStreamRepository with ConfigRepository with Has[DatagramChannel], IOException, (Any, Chunk[Boolean])] =
+  def getStream: ZStream[ChunkStreamRepository with ConfigRepository with Has[DatagramChannel], IOException, (Any, Chunk[Byte])] =
     ZStream.accessStream(_.get.getStream)
 }

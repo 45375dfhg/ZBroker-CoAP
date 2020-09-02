@@ -2,7 +2,7 @@ import java.io.IOException
 
 import zio.Chunk
 
-final case class CoapMessage[T](header: CoapHeader, body: CoapBody[T])
+final case class CoapMessage(header: CoapHeader, body: CoapBody)
 
 final case class CoapHeader(
   version : CoapVersion,
@@ -13,10 +13,10 @@ final case class CoapHeader(
   msgID   : CoapId
 )
 
-final case class CoapBody[T](
+final case class CoapBody(
   token   : CoapToken,
   options : List[CoapOption],
-  payload : CoapPayload[T]
+  payload : CoapPayload
 )
 
 sealed trait CoapMessageException           extends IOException
@@ -26,6 +26,7 @@ case object InvalidCoapTypeException        extends CoapMessageException
 case object InvalidCoapTokenLengthException extends CoapMessageException
 case object InvalidCoapCodeException        extends CoapMessageException
 case object InvalidCoapIdException          extends CoapMessageException
+case object InvalidCoapChunkSize            extends CoapMessageException
 
 // TODO: Necessary?
 sealed trait CoapHeaderParameter
@@ -102,9 +103,8 @@ object CoapOptionLength extends CoapBodyParameter {
     Either.cond(0 to 65804 contains value, new CoapOptionLength(value), InvalidOptionLength)
 }
 
-final case class CoapOptionValue() // TODO: Implementation
+final case class CoapOptionValue(value: Chunk[Byte]) extends CoapBodyParameter // TODO: Implementation
 
 final case class CoapOptionNumber(value: Int) extends AnyVal
 
-sealed abstract class CoapPayLoad
-final case class CoapPayload[T](value: T) extends CoapBodyParameter
+final case class CoapPayload(value: Chunk[Byte]) extends CoapBodyParameter
