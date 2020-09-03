@@ -85,7 +85,8 @@ final case class CoapOption(
   delta  : CoapOptionDelta,  // internal?
   length : CoapOptionLength, // internal!
   value  : CoapOptionValue,
-  number : CoapOptionNumber
+  number : CoapOptionNumber,
+  offset : CoapOptionOffset
 ) extends CoapBodyParameter
 
 final case class CoapOptionDelta(value: Int) extends AnyVal
@@ -103,6 +104,8 @@ object CoapOptionLength extends CoapBodyParameter {
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 65804 contains value, new CoapOptionLength(value), InvalidOptionLength(s"${value} is not valid."))
 }
+
+final case class CoapOptionOffset(value: Int) extends AnyVal
 
 final case class CoapOptionValue(value: Chunk[Byte]) extends CoapBodyParameter // TODO: Implementation
 
