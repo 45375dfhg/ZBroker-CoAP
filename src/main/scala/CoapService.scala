@@ -7,13 +7,13 @@ object CoapService {
   /**
    * Takes a chunk and attempts to convert it into a CoapMessage.
    * <p>
-   * take and drop might return an empty Chunk instead of failing.
+   * Calls via take and drop might return an empty Chunk instead of failing.
    * Therefore error handling has to be done on different layers of the transformation.
    * <p>
    * Error handling is done via short-circuiting since a malformed packet would throw
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
-  def fromChunk(chunk: Chunk[Byte]): Either[CoapMessageException, CoapMessage] =
+  def extractFromChunk(chunk: Chunk[Byte]): Either[CoapMessageException, CoapMessage] =
     for {
       header <- headerFromChunk(chunk.take(4))
       body   <- bodyFromChunk(chunk.drop(4), header)
@@ -44,10 +44,14 @@ object CoapService {
    * @return Either a CoapBody or an Exception
    */
   private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): Either[CoapMessageException, CoapBody] = {
-      // extract the token and continue with the remainder
-      val length = header.tLength.value
-      val token  = CoapToken(chunk.take(length))
-      val c      = chunk.drop(length)
+    // extract the token and continue with the remainder
+    val length = header.tLength.value
+    val token  = CoapToken(chunk.take(length))
+    val c      = chunk.drop(length)
+
+    def extractToken(chunk: Chunk[Byte], tLength: Int): Either[CoapMessageException, Chunk[Byte]] =
+      if (chunk.lengthCompare(tLength) >= 0) Right(chunk.take(tLength))
+      else Left(InvalidCoapChunkSize("Packet ended prematurely. Failed to extract promised token."))
 
     @tailrec
     def grabOptions(
@@ -58,7 +62,7 @@ object CoapService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(option) => grabOptions(rem.drop(option.offset.value), option :: acc, num + option.number.value)
+            case Right(result) => grabOptions(rem.drop(result.offset.value), result :: acc, num + result.number.value)
             case Left(err)     => Left(err)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
@@ -70,44 +74,71 @@ object CoapService {
     ???
   }
 
-  private def parseNextOption(head: Byte, chunk: Chunk[Byte], num: Int): Either[CoapMessageException, CoapOption] = {
-    val optionBody = chunk.drop(1) // TODO: refactor
+  private def parseNextOption(optionHeader: Byte, chunk: Chunk[Byte], num: Int): Either[CoapMessageException, CoapOption] = {
+    // option header is always one byte - empty check happens during parameter extraction
+    val remainder = chunk.drop(1)
 
     for {
-      deltaRes  <- getDelta(head, optionBody)
-      (deltaRaw, deltaOffset) = deltaRes
-      lengthRes <- getLength(head, optionBody, deltaOffset)
-      (lengthRaw, lengthOffset) = lengthRes
-      valueRaw  <- getValue(optionBody, lengthRaw, deltaOffset + lengthOffset)
-      delta     <- CoapOptionDelta(deltaRaw)
-      length    <- CoapOptionLength(lengthRaw)
-      value      = CoapOptionValue(valueRaw)
-      number     = CoapOptionNumber(num + delta.value)
-      offset     = CoapOptionOffset(1 + deltaOffset + lengthOffset + lengthRaw)
+      // extract delta value from header, possibly extend to second and third byte and pass possible offset
+      deltaTuple  <- getDelta(optionHeader, remainder)
+      (delta, deltaOffset) = deltaTuple
+      // extract length value from header, possible extension which depends on the offset of the delta value, pass offset
+      lengthTuple <- getLength(optionHeader, remainder, deltaOffset)
+      (length, lengthOffset) = lengthTuple
+      // get the value starting at the position based on the two offsets, ending at that value plus the length value
+      value       <- getValue(remainder, length, deltaOffset + lengthOffset)
+      number       = CoapOptionNumber(num + delta.value)
+      // offset can be understood as the size of the parameter group
+      offset       = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
     } yield CoapOption(delta, length, value, number, offset)
   }
 
-
-  private def getDelta(b: Byte, chunk: Chunk[Byte]): Either[CoapMessageException, (Int, Int)] =
+  private def getDelta(b: Byte, chunk: Chunk[Byte]): Either[CoapMessageException, (CoapOptionDelta, CoapOptionOffset)] =
     (b & 0xF0) >>> 4 match {
-      case 13 => extractByte(chunk.take(1)).flatMap(i => Right((i + 13, 1)))
-      case 14 => merge2Bytes(chunk.take(2)).flatMap(i => Right((i + 269, 2)))
+      case 13 => for {
+          i <- extractByte(chunk.take(1))
+          d <- CoapOptionDelta(i + 13)
+        } yield (d, CoapOptionOffset(1))
+      case 14 => for {
+          i <- merge2Bytes(chunk.take(2))
+          d <- CoapOptionDelta(i + 269)
+        } yield (d, CoapOptionOffset(2))
       case 15 => Left(InvalidOptionDelta("15 is a reserved value."))
-      case other => Right((other, 0))
+      case other if 0 to 12 contains other => for {
+          d <- CoapOptionDelta(other)
+        } yield (d, CoapOptionOffset(0))
+      case e => Left(InvalidOptionDelta(s"Illegal delta value of ${e}. Initial value must be between 0 and 15."))
     }
 
-  private def getLength(b: Byte, chunk: Chunk[Byte], offset: Int): Either[CoapMessageException, (Int, Int)] =
+  private def getLength(
+    b: Byte,
+    chunk: Chunk[Byte],
+    offset: CoapOptionOffset
+  ): Either[CoapMessageException, (CoapOptionLength, CoapOptionOffset)] =
     b & 0x0F match {
-      case 13 => extractByte(chunk.drop(offset).take(1)).flatMap(i => Right((i + 13, 1)))
-      case 14 => merge2Bytes(chunk.drop(offset).take(2)).flatMap(i => Right((i + 269, 2)))
+      case 13 => for {
+          i <- extractByte(chunk.drop(offset.value).take(1))
+          l <- CoapOptionLength(i + 13)
+        } yield (l, CoapOptionOffset(2))
+      case 14 => for {
+          i <- merge2Bytes(chunk.drop(offset.value).take(2))
+          l <- CoapOptionLength(i + 269)
+        } yield (l, CoapOptionOffset(2))
       case 15 => Left(InvalidOptionLength("15 is a reserved length value."))
-      case other => Right(other, 0)
+      case other if 0 to 12 contains other => for {
+          l <- CoapOptionLength(other)
+       } yield (l, CoapOptionOffset(2))
+      case e => Left(InvalidOptionLength(s"Illegal length value of ${e}. Initial value must be between 0 and 15"))
     }
 
-  private def getValue(chunk: Chunk[Byte], length: Int, offset: Int): Either[InvalidCoapChunkSize, Chunk[Byte]] = {
-    val dropOptionHeader = chunk.drop(offset)
-    if (dropOptionHeader.lengthCompare(length) >= 0) Right(dropOptionHeader.take(length))
-    else Left(InvalidCoapChunkSize("Packet ended prematurely. Failed to extract whole option value."))
+  private def getValue(
+    chunk: Chunk[Byte],
+    length: CoapOptionLength,
+    offset: CoapOptionOffset
+  ): Either[InvalidCoapChunkSize, CoapOptionValue] = {
+    val dropOptionHeader = chunk.drop(offset.value)
+    if (dropOptionHeader.lengthCompare(length.value) >= 0) Right(CoapOptionValue(dropOptionHeader.take(length.value)))
+    else Left(InvalidCoapChunkSize("Packet ended prematurely. Failed to extract an option value."))
   }
 
   private def extractByte(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
@@ -124,5 +155,4 @@ object CoapService {
   private def getCPrefix(b: Byte): Int = (b & 0xE0) >>> 5
   private def getCSuffix(b: Byte): Int = b & 0x1F
   private def getMsgId(third: Byte, fourth: Byte): Int = (third << 8) | (fourth & 0xFF)
-
 }

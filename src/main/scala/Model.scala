@@ -105,10 +105,15 @@ object CoapOptionLength extends CoapBodyParameter {
     Either.cond(0 to 65804 contains value, new CoapOptionLength(value), InvalidOptionLength(s"${value} is not valid."))
 }
 
-final case class CoapOptionOffset(value: Int) extends AnyVal
+final case class CoapOptionOffset(value: Int) extends AnyVal {
+  def +(that: CoapOptionOffset): CoapOptionOffset = CoapOptionOffset(value + that.value)
+  def +(that: Int): CoapOptionOffset = CoapOptionOffset(value + that)
+}
 
 final case class CoapOptionValue(value: Chunk[Byte]) extends CoapBodyParameter // TODO: Implementation
 
 final case class CoapOptionNumber(value: Int) extends AnyVal
 
 final case class CoapPayload(value: Chunk[Byte]) extends CoapBodyParameter
+
+
