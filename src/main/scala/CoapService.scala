@@ -45,13 +45,13 @@ object CoapService {
    */
   private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): Either[CoapMessageException, CoapBody] = {
     // extract the token and continue with the remainder
-    val length = header.tLength.value
-    val token  = CoapToken(chunk.take(length))
-    val c      = chunk.drop(length)
+    val length    = header.tLength.value
+    val remainder = chunk.drop(length)
 
-    def extractToken(chunk: Chunk[Byte], tLength: Int): Either[CoapMessageException, Chunk[Byte]] =
-      if (chunk.lengthCompare(tLength) >= 0) Right(chunk.take(tLength))
+    def extractToken(chunk: Chunk[Byte]): Either[CoapMessageException, CoapToken] = {
+      if (chunk.lengthCompare(length) >= 0) Right(CoapToken(chunk.take(length)))
       else Left(InvalidCoapChunkSize("Packet ended prematurely. Failed to extract promised token."))
+    }
 
     @tailrec
     def grabOptions(
@@ -71,22 +71,33 @@ object CoapService {
           case None    => Right(acc, None)
         }
     }
-    ???
+
+    // TODO: Refactor part below
+    val tokenOption = if (length != 0) for {
+        token <- extractToken(chunk)
+      } yield Some(token) else None[CoapToken]
+
+    for {
+      t       <- tokenOption
+      optsPay <- grabOptions(remainder)
+      options  = if (optsPay._1.nonEmpty) Some(optsPay._1) else None[List[CoapOption]]
+      payload  = optsPay._2
+    } yield CoapBody(t, options, payload)
   }
 
   private def parseNextOption(optionHeader: Byte, chunk: Chunk[Byte], num: Int): Either[CoapMessageException, CoapOption] = {
     // option header is always one byte - empty check happens during parameter extraction
-    val remainder = chunk.drop(1)
+    val optionBody = chunk.drop(1)
 
     for {
       // extract delta value from header, possibly extend to second and third byte and pass possible offset
-      deltaTuple  <- getDelta(optionHeader, remainder)
+      deltaTuple  <- getDelta(optionHeader, optionBody)
       (delta, deltaOffset) = deltaTuple
       // extract length value from header, possible extension which depends on the offset of the delta value, pass offset
-      lengthTuple <- getLength(optionHeader, remainder, deltaOffset)
+      lengthTuple <- getLength(optionHeader, optionBody, deltaOffset)
       (length, lengthOffset) = lengthTuple
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
-      value       <- getValue(remainder, length, deltaOffset + lengthOffset)
+      value       <- getValue(optionBody, length, deltaOffset + lengthOffset)
       number       = CoapOptionNumber(num + delta.value)
       // offset can be understood as the size of the parameter group
       offset       = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)

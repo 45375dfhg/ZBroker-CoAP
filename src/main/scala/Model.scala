@@ -14,9 +14,9 @@ final case class CoapHeader(
 )
 
 final case class CoapBody(
-  token   : CoapToken,
-  options : List[CoapOption],
-  payload : CoapPayload
+  token   : Option[CoapToken],
+  options : Option[List[CoapOption]],
+  payload : Option[CoapPayload]
 )
 
 sealed trait CoapMessageException           extends IOException
