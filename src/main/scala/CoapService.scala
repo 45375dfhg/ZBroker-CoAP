@@ -136,7 +136,7 @@ object CoapService {
       case 15 => Left(InvalidOptionLength("15 is a reserved length value."))
       case other if 0 to 12 contains other => for {
           l <- CoapOptionLength(other)
-       } yield (l, CoapOptionOffset(2))
+       } yield (l, CoapOptionOffset(0))
       case e => Left(InvalidOptionLength(s"Illegal length value of ${e}. Initial value must be between 0 and 15"))
     }
 
