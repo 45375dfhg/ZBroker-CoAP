@@ -1,3 +1,5 @@
+package root
+
 import zio.Chunk
 
 import scala.annotation.tailrec
@@ -72,17 +74,13 @@ object CoapService {
         }
     }
 
-    // TODO: Refactor part below
-    val tokenOption = if (length != 0) for {
-        token <- extractToken(chunk)
-      } yield Some(token) else None[CoapToken]
-
     for {
-      t       <- tokenOption
+      t       <- extractToken(chunk)
+      token    = if (t.value.nonEmpty) Some(t) else None
       optsPay <- grabOptions(remainder)
-      options  = if (optsPay._1.nonEmpty) Some(optsPay._1) else None[List[CoapOption]]
+      options  = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
       payload  = optsPay._2
-    } yield CoapBody(t, options, payload)
+    } yield CoapBody(token, options, payload)
   }
 
   private def parseNextOption(optionHeader: Byte, chunk: Chunk[Byte], num: Int): Either[CoapMessageException, CoapOption] = {
@@ -165,5 +163,5 @@ object CoapService {
   private def getTLength(b: Byte): Int = b & 0x0F
   private def getCPrefix(b: Byte): Int = (b & 0xE0) >>> 5
   private def getCSuffix(b: Byte): Int = b & 0x1F
-  private def getMsgId(third: Byte, fourth: Byte): Int = (third << 8) | (fourth & 0xFF)
+  private def getMsgId(third: Byte, fourth: Byte): Int = ((third & 0xFF) << 8) | (fourth & 0xFF)
 }

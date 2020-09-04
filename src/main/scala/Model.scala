@@ -1,3 +1,5 @@
+package root
+
 import java.io.IOException
 
 import zio.Chunk
@@ -79,7 +81,7 @@ object CoapId extends CoapHeaderParameter {
     Either.cond(0 to 65535 contains value, new CoapId(value), InvalidCoapIdException(s"${value} is not valid."))
 }
 
-final case class CoapToken(byte: Chunk[Byte]) extends CoapBodyParameter
+final case class CoapToken(value: Chunk[Byte]) extends CoapBodyParameter
 
 final case class CoapOption(
   delta  : CoapOptionDelta,  // internal?
@@ -107,7 +109,7 @@ object CoapOptionLength extends CoapBodyParameter {
 
 final case class CoapOptionOffset(value: Int) extends AnyVal {
   def +(that: CoapOptionOffset): CoapOptionOffset = CoapOptionOffset(value + that.value)
-  def +(that: Int): CoapOptionOffset = CoapOptionOffset(value + that)
+  // def +(that: Int): CoapOptionOffset = CoapOptionOffset(value + that)
 }
 
 final case class CoapOptionValue(value: Chunk[Byte]) extends CoapBodyParameter // TODO: Implementation
