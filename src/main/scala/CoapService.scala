@@ -149,11 +149,8 @@ object CoapService {
     chunk: Chunk[Byte],
     length: CoapOptionLength,
     offset: CoapOptionOffset
-  ): Either[CoapMessageException, CoapOptionValue] = {
-    val dropOptionHeader = chunk.drop(offset.value)
-    if (dropOptionHeader.lengthCompare(length.value) >= 0) Right(CoapOptionValue(dropOptionHeader.take(length.value)))
-    else Left(InvalidCoapChunkSize)
-  }
+  ): Either[CoapMessageException, CoapOptionValue] =
+    chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).map(CoapOptionValue)
 
   private def extractByte(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
