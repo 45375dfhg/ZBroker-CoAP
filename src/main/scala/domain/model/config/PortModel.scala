@@ -1,4 +1,4 @@
-package domain.model.values
+package domain.model.config
 
 import java.io.IOException
 

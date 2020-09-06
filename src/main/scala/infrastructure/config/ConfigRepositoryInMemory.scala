@@ -1,7 +1,7 @@
 package infrastructure.config
 
-import domain.model.config.ConfigRepository
-import domain.model.values._
+import domain.model.config._
+
 import zio._
 
 object ConfigRepositoryInMemory extends ConfigRepository.Service {

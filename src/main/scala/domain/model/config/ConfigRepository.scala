@@ -1,6 +1,5 @@
 package domain.model.config
 
-import domain.model.values._
 import zio._
 
 object ConfigRepository {
