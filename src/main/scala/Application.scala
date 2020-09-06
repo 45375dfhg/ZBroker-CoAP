@@ -16,7 +16,7 @@ object Application extends App {
         ChunkStreamRepository
           .getStream
           .tap(b => putStrLn(b._2.toString))
-          .mapM(e => ZIO.fromEither(CoapService.extractFromChunk(e._2)))
+          .mapM(e => CoapService.extractFromChunk(e._2))
           .tap(a => putStrLn(a.toString)),
         OutgoingStream.send)
     } yield ()).runDrain

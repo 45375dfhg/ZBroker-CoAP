@@ -21,20 +21,20 @@ final case class CoapBody(
   payload : Option[CoapPayload]
 )
 
-sealed trait CoapMessageException           extends IOException
+sealed trait CoapMessageException                              extends IOException
 
 final case class InvalidCoapVersionException (err: String)     extends CoapMessageException
 final case class InvalidCoapTypeException (err: String)        extends CoapMessageException
 final case class InvalidCoapTokenLengthException (err: String) extends CoapMessageException
 final case class InvalidCoapCodeException (err: String)        extends CoapMessageException
 final case class InvalidCoapIdException (err: String)          extends CoapMessageException
-final case class InvalidCoapChunkSize (err: String)            extends CoapMessageException
 final case class InvalidOptionDelta (err: String)              extends CoapMessageException
 final case class InvalidOptionLength (err: String)             extends CoapMessageException
 final case class InvalidOptionValue (err: String)              extends CoapMessageException
 final case class InvalidOptionNumber (err: String)             extends CoapMessageException
 
 case object InvalidPayloadMarker                               extends CoapMessageException
+case object InvalidCoapChunkSize                               extends CoapMessageException
 
 // TODO: Necessary?
 sealed trait CoapHeaderParameter
@@ -46,6 +46,8 @@ object CoapVersion extends CoapHeaderParameter {
     // #rfc7252 knows only one valid protocol version
     Either.cond(1 to 1 contains number, new CoapVersion(1), InvalidCoapVersionException(s"${number} is not valid."))
 }
+
+
 
 final case class CoapType private(number: Int) extends AnyVal
 object CoapType extends CoapHeaderParameter {
