@@ -1,6 +1,7 @@
-package root
+package domain.api
 
-import root.ChunkUtility.ChunkFailingTake
+import domain.model.coap._
+import utility.ChunkExtension._
 import zio.{Chunk, UIO, ZIO}
 
 import scala.annotation.tailrec
@@ -177,18 +178,4 @@ object CoapService {
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
 }
 
-// TODO: Move to its own file & directory
-object ChunkUtility {
-  implicit class ChunkFailingTake[A](chunk: Chunk[A]) {
-    def takeExactly(n: Int): Either[CoapMessageException, Chunk[A]] = {
-      val elements = chunk.take(n)
-      if (elements.lengthCompare(n) >= 0) Right(elements)
-      else Left(InvalidCoapChunkSize)
-    }
-    def dropExactly(n: Int): Either[CoapMessageException, Chunk[A]] = {
-      if (chunk.lengthCompare(n) >= 0) Right(chunk.drop(n))
-      else Left(InvalidCoapChunkSize)
-    }
-  }
-}
 

@@ -1,14 +1,18 @@
+
+import domain.api.CoapService
 import domain.model.stream.ChunkStreamRepository
+
 import infrastructure.config.ConfigRepositoryInMemory
 import infrastructure.endpoint.EndpointRepositoryFromSocket
 import infrastructure.stream.{ChunkStreamFromSocket, OutgoingStream}
-import root._
-import zio.{App, ZIO}
+
+import zio.App
 import zio.console._
 import zio.stream._
 
 object Application extends App {
 
+  // TODO: NOT allowed to import domain content - expose infrastructure only!
   val program =
     (for {
       _ <- ZStream.fromEffect(putStrLn("booting up ..."))
