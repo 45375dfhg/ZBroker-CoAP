@@ -156,12 +156,10 @@ object CoapService {
   }
 
   private def extractByte(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
-    if (bytes.lengthCompare(1) == 0) Right(bytes.head.toInt)
-    else Left(InvalidCoapChunkSize)
+    bytes.takeExactly(1).map(_.head.toInt)
 
   private def merge2Bytes(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
-    if (bytes.lengthCompare(2) == 0) Right((bytes(0) << 8) | (bytes(1) & 0xFF))
-    else Left(InvalidCoapChunkSize)
+    bytes.takeExactly(2).map(chunk => (chunk(0) << 8) | (chunk(1) & 0xFF))
 
   private def getVersion(b: Byte): Either[CoapMessageException, CoapVersion] =
     CoapVersion((b & 0xF0) >>> 6)
