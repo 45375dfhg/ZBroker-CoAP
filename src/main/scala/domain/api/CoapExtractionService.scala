@@ -118,7 +118,7 @@ object CoapExtractionService {
   ): Either[CoapMessageException, (CoapOptionDelta, Option[CoapExtendedDelta], CoapOptionOffset)] =
     (b & 0xF0) >>> 4 match {
       case 13 => for {
-          i <- extractByte(chunk.take(1))
+          i <- extractByte(chunk)
           d <- CoapOptionDelta(13)
           e <- CoapExtendedDelta(i + 13)
         } yield (d, Some(e), CoapOptionOffset(1))
