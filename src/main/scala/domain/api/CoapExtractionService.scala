@@ -98,54 +98,63 @@ object CoapExtractionService {
 
     for {
       // extract delta value from header, possibly extend to second and third byte and pass possible offset
-      deltaTuple  <- getDelta(optionHeader, optionBody)
-      (delta, deltaOffset) = deltaTuple
+      deltaTriplet  <- getDelta(optionHeader, optionBody)
+      (delta, extDelta, deltaOffset) = deltaTriplet
       // extract length value from header, possible extension which depends on the offset of the delta value, pass offset
-      lengthTuple <- getLength(optionHeader, optionBody, deltaOffset)
-      (length, lengthOffset) = lengthTuple
+      lengthTriplet <- getLength(optionHeader, optionBody, deltaOffset)
+      (length, extLength, lengthOffset) = lengthTriplet
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
       value       <- getValue(optionBody, length, deltaOffset + lengthOffset)
       number       = CoapOptionNumber(num + delta.value)
       // offset can be understood as the size of the parameter group
       offset       = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
-    } yield CoapOption(delta, length, value, number, offset)
+    } yield CoapOption(delta, extDelta, length, extLength, value, number, offset)
   }
 
-  private def getDelta(b: Byte, chunk: Chunk[Byte]): Either[CoapMessageException, (CoapOptionDelta, CoapOptionOffset)] =
+  // TODO: Refactor
+  private def getDelta(
+    b: Byte,
+    chunk: Chunk[Byte]
+  ): Either[CoapMessageException, (CoapOptionDelta, Option[CoapExtendedDelta], CoapOptionOffset)] =
     (b & 0xF0) >>> 4 match {
       case 13 => for {
           i <- extractByte(chunk.take(1))
-          d <- CoapOptionDelta(i + 13)
-        } yield (d, CoapOptionOffset(1))
+          d <- CoapOptionDelta(13)
+          e <- CoapExtendedDelta(i + 13)
+        } yield (d, Some(e), CoapOptionOffset(1))
       case 14 => for {
           i <- merge2Bytes(chunk.take(2))
-          d <- CoapOptionDelta(i + 269)
-        } yield (d, CoapOptionOffset(2))
+          d <- CoapOptionDelta(14)
+          e <- CoapExtendedDelta(i + 269)
+        } yield (d, Some(e), CoapOptionOffset(2))
       case 15 => Left(InvalidOptionDelta("15 is a reserved value."))
       case other if 0 to 12 contains other => for {
           d <- CoapOptionDelta(other)
-        } yield (d, CoapOptionOffset(0))
+        } yield (d, None, CoapOptionOffset(0))
       case e => Left(InvalidOptionDelta(s"Illegal delta value of $e. Initial value must be between 0 and 15."))
     }
 
+  // TODO: Refactor
   private def getLength(
     b: Byte,
     chunk: Chunk[Byte],
     offset: CoapOptionOffset
-  ): Either[CoapMessageException, (CoapOptionLength, CoapOptionOffset)] =
+  ): Either[CoapMessageException, (CoapOptionLength, Option[CoapExtendedLength], CoapOptionOffset)] =
     b & 0x0F match {
       case 13 => for {
           i <- extractByte(chunk.drop(offset.value).take(1))
-          l <- CoapOptionLength(i + 13)
-        } yield (l, CoapOptionOffset(2))
+          l <- CoapOptionLength(13)
+          e <- CoapExtendedLength(i + 13)
+        } yield (l, Some(e), CoapOptionOffset(2))
       case 14 => for {
           i <- merge2Bytes(chunk.drop(offset.value).take(2))
-          l <- CoapOptionLength(i + 269)
-        } yield (l, CoapOptionOffset(2))
+          l <- CoapOptionLength(14)
+          e <- CoapExtendedLength(i + 269)
+        } yield (l, Some(e), CoapOptionOffset(2))
       case 15 => Left(InvalidOptionLength("15 is a reserved length value."))
       case other if 0 to 12 contains other => for {
           l <- CoapOptionLength(other)
-       } yield (l, CoapOptionOffset(0))
+       } yield (l, None, CoapOptionOffset(0))
       case e => Left(InvalidOptionLength(s"Illegal length value of $e. Initial value must be between 0 and 15"))
     }
 

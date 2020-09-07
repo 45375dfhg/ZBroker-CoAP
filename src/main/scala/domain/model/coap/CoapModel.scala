@@ -84,30 +84,48 @@ object CoapId extends CoapHeaderParameter {
 final case class CoapToken(value: Chunk[Byte]) extends CoapBodyParameter
 
 final case class CoapOption(
-  delta  : CoapOptionDelta,  // internal?
-  length : CoapOptionLength, // internal!
-  value  : CoapOptionValue,
-  number : CoapOptionNumber,
-  offset : CoapOptionOffset
+  delta    : CoapOptionDelta,  // internal?
+  exDelta  : Option[CoapExtendedDelta],
+  length   : CoapOptionLength, // internal!
+  exLength : Option[CoapExtendedLength],
+  value    : CoapOptionValue,
+  number   : CoapOptionNumber, // questionable
+  offset   : CoapOptionOffset  // same
 ) extends CoapBodyParameter
 
-final case class CoapOptionDelta(value: Int) extends AnyVal
+final case class CoapOptionDelta private(value: Int) extends AnyVal
 object CoapOptionDelta extends CoapBodyParameter {
   def apply(value: Int): Either[CoapMessageException, CoapOptionDelta] =
   // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
   // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    Either.cond(0 to 65804 contains value, new CoapOptionDelta(value), InvalidOptionDelta(s"${value} is not valid."))
+    Either.cond(0 to 15 contains value, new CoapOptionDelta(value), InvalidOptionDelta(s"${value} is not valid."))
 }
 
-final case class CoapOptionLength(value: Int) extends AnyVal
+final case class CoapExtendedDelta private(value: Int)
+object CoapExtendedDelta extends CoapBodyParameter {
+  def apply(value: Int): Either[CoapMessageException, CoapExtendedDelta] =
+  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+  // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    Either.cond(13 to 65804 contains value, new CoapExtendedDelta(value), InvalidOptionDelta(s"${value} is not valid."))
+}
+
+final case class CoapOptionLength private(value: Int) extends AnyVal
 object CoapOptionLength extends CoapBodyParameter {
   def apply(value: Int): Either[CoapMessageException, CoapOptionLength] =
   // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
   // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    Either.cond(0 to 65804 contains value, new CoapOptionLength(value), InvalidOptionLength(s"${value} is not valid."))
+    Either.cond(0 to 15 contains value, new CoapOptionLength(value), InvalidOptionLength(s"${value} is not valid."))
 }
 
-final case class CoapOptionOffset(value: Int) extends AnyVal {
+final case class CoapExtendedLength private(value: Int)
+object CoapExtendedLength extends CoapBodyParameter {
+  def apply(value: Int): Either[CoapMessageException, CoapExtendedLength] =
+  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+  // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    Either.cond(13 to 65804 contains value, new CoapExtendedLength(value), InvalidOptionLength(s"${value} is not valid."))
+}
+
+final case class CoapOptionOffset (value: Int) extends AnyVal {
   def +(that: CoapOptionOffset): CoapOptionOffset = CoapOptionOffset(value + that.value)
   // def +(that: Int): CoapOptionOffset = CoapOptionOffset(value + that)
 }

@@ -4,12 +4,44 @@ import domain.model.coap._
 import zio.Chunk
 
 /**
- * This service transforms instances of internal CoAP representations to valid CoAP messages
- * in the Chunk[Byte] format to be sent to third parties.
+ * This service provides functionality to transform an internal representation of a CoAP message
+ * into its respective low level form. The result type is of Chunk[Byte] and thus can be
+ * transported to third parties via a ZIO-NIO channel
  */
 object CoapGenerationService {
   def generateFromMessage(message: CoapMessage) = {
 
+  }
+
+  // TODO: WARNING TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
+  private def generateBody(body: CoapBody): Chunk[Byte] = {
+
+    def generateAllOptions(list: List[CoapOption]) = ???
+
+    def generateOneOption(option: CoapOption) = ???
+
+    def generateDelta(delta: CoapOptionDelta): Byte = ???
+
+
+    val token =
+      body.token match {
+        case Some(t) => t.value
+        case None => Chunk.empty
+      }
+
+    val options =
+      body.options match {
+        case Some(opts) => opts
+        case None => Chunk.empty
+      }
+
+    val payload =
+      body.payload match {
+        case Some(pay) => pay.value
+        case None => Chunk.empty
+      }
+
+    ???
   }
 
   private def generateHeader(head: CoapHeader): Chunk[Byte] = {
@@ -45,40 +77,4 @@ object CoapGenerationService {
     firstByte +: (secondByte +: thirdAndFourthChunk)
   }
 }
-
-
-
-//trait Extract[A <: AnyVal] {
-//  def extract(param: A): Int
-//}
-//
-//object Extract {
-//
-//  def extract[A: Extract](param: A)(implicit ex: Extract[A]) =
-//    ex.extract(param)
-//
-//  implicit class ExtractOps[A: Extract](param: A) {
-//    def extract: Int = Extract[A].extract(param)
-//  }
-//
-//  def apply[A](implicit ex: Extract[A]): Extract[A] = ex
-//
-//  implicit val extractVersion: Extract[CoapVersion] =
-//    (param: CoapVersion) => param.number
-//
-//  implicit val extractType: Extract[CoapType] =
-//    (param: CoapType) => param.number
-//
-//  implicit val extractTokenLength: Extract[CoapTokenLength] =
-//    (param: CoapTokenLength) => param.value
-//
-//  implicit val extractCodePrefix: Extract[CoapCodePrefix] =
-//    (param: CoapCodePrefix) => param.number
-//
-//  implicit val extractCodeSuffix: Extract[CoapCodeSuffix] =
-//    (param: CoapCodeSuffix) => param.number
-//
-//  implicit val extractCodeId: Extract[CoapId] =
-//    (param: CoapId) => param.value
-//}
 
