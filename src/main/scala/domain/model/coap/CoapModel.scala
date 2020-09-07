@@ -47,8 +47,6 @@ object CoapVersion extends CoapHeaderParameter {
     Either.cond(1 to 1 contains number, new CoapVersion(1), InvalidCoapVersionException(s"${number} is not valid."))
 }
 
-
-
 final case class CoapType private(number: Int) extends AnyVal
 object CoapType extends CoapHeaderParameter {
   def apply(number: Int): Either[CoapMessageException, CoapType] =

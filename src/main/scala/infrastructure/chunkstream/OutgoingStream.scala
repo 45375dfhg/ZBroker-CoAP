@@ -1,12 +1,15 @@
-package infrastructure.stream
+package infrastructure.chunkstream
 
-import zio.console.putStrLn
+import zio.console._
+import zio.duration._
 import zio.{Schedule, ZIO}
+
 import zio.nio.core.channels.DatagramChannel
 import zio.nio.core.{Buffer, SocketAddress}
-import zio.stream.ZStream
-import zio.duration._
 
+import zio.stream.ZStream
+
+// TODO: Burn this down
 object OutgoingStream {
 
   def send =
@@ -19,5 +22,5 @@ object OutgoingStream {
         _       <- putStrLn("SEND")
         i       <- server.send(buffer, address)
       } yield i
-    }, Schedule.spaced(100.second) && Schedule.recurs(10))
+    }, Schedule.spaced(1.second) && Schedule.recurs(1))
 }

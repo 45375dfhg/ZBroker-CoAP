@@ -1,11 +1,11 @@
-package infrastructure.stream
+package infrastructure.chunkstream
 
 import java.io.IOException
 
 import domain.model.config.ConfigRepository
 import domain.model.config.ConfigRepository.ConfigRepository
-import domain.model.stream.ChunkStreamRepository
-import domain.model.stream.ChunkStreamRepository.ChunkStreamRepository
+import domain.model.chunkstream.ChunkStreamRepository
+import domain.model.chunkstream.ChunkStreamRepository.ChunkStreamRepository
 
 import zio.{Chunk, Has, ZIO, ZLayer}
 import zio.nio.core.channels.DatagramChannel
@@ -15,7 +15,7 @@ import zio.console._
 
 object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
 
-  override def getStream:
+  override def getChunkStream:
   ZStream[ConfigRepository with Has[DatagramChannel], IOException, (Option[SocketAddress], Chunk[Byte])] =
     ZStream.repeatEffect {
       (for {

@@ -1,10 +1,10 @@
 
-import domain.api.CoapService
-import domain.model.stream.ChunkStreamRepository
+import domain.api.CoapExtractionService
+import domain.model.chunkstream.ChunkStreamRepository
 
 import infrastructure.config.ConfigRepositoryInMemory
 import infrastructure.endpoint.EndpointRepositoryFromSocket
-import infrastructure.stream.{ChunkStreamFromSocket, OutgoingStream}
+import infrastructure.chunkstream.{ChunkStreamFromSocket, OutgoingStream}
 
 import zio.App
 import zio.console._
@@ -12,17 +12,16 @@ import zio.stream._
 
 object Application extends App {
 
-  // TODO: NOT allowed to import domain content - expose infrastructure only!
   val program =
     (for {
       _ <- ZStream.fromEffect(putStrLn("booting up ..."))
       _ <- ZStream.mergeAll(2, 16)(
         ChunkStreamRepository
-          .getStream
-          .tap(b => putStrLn(b._2.toString))
-          .mapM(e => CoapService.extractFromChunk(e._2))
-          .tap(a => putStrLn(a.toString)),
-        OutgoingStream.send)
+          .getChunkStream
+          //.tap(b => putStrLn(b._2.toString))
+          .mapM(e => CoapExtractionService.extractFromChunk(e._2))
+          //.tap(a => putStrLn(a.toString)),
+        , OutgoingStream.send)
     } yield ()).runDrain
 
   val partialLayer = (

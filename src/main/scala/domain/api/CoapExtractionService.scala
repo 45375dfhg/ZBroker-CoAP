@@ -6,7 +6,11 @@ import zio.{Chunk, UIO, ZIO}
 
 import scala.annotation.tailrec
 
-object CoapService {
+/**
+ * This service provides the functionality to extract CoAP parameters from Chunk[Byte]
+ * and transform them to a model representation of a CoAP message for internal usage.
+ */
+object CoapExtractionService {
 
   /**
    * Takes a chunk and attempts to convert it into a CoapMessage.
@@ -17,11 +21,10 @@ object CoapService {
    * Error handling is done via short-circuiting since a malformed packet would throw
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
-
   def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[CoapMessageException, CoapMessage]] =
     ZIO.fromEither(for {
       header <- chunk.takeExactly(4).flatMap(headerFromChunk)
-      body <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
+      body   <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
     } yield CoapMessage(header, body)).either
 
   /**
@@ -156,6 +159,7 @@ object CoapService {
   private def extractByte(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
+  // TODO: Might need & 0xFF added to the first byte
   private def merge2Bytes(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(2).map(chunk => (chunk(0) << 8) | (chunk(1) & 0xFF))
 
