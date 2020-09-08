@@ -41,6 +41,9 @@ object Extractor {
   implicit val extractCoapExtendedDelta: Extractor[CoapExtendedDelta] =
     (param: CoapExtendedDelta) => param.value
 
+  implicit val extractCoapOptionLength: Extractor[CoapOptionLength] =
+    (param: CoapOptionLength) => param.value
+
   implicit val extractCoapExtendedLength: Extractor[CoapExtendedLength] =
     (param: CoapExtendedLength) => param.value
 }

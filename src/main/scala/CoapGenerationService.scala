@@ -17,7 +17,24 @@ object CoapGenerationService {
   def generateFromMessage(message: CoapMessage): Chunk[Byte] =
     generateHeader(message.header) ++ generateBody(message.body)
 
+  /**
+   * Generates the parameters of the first header byte and prepends them to the parameters of the second
+   * byte and lastly to the Chunk that contains the two bytes of the ID.
+   *
+   * While Chunks are implemented via Arrays they are implemented as Conc-Trees:
+   * Their prepend complexity is 0(1).
+   */
+  private def generateHeader(head: CoapHeader): Chunk[Byte] = {
+    ((generateAsByte(head.version) + generateAsByte(head.msgType) + generateAsByte(head.tLength)) +:
+      ((generateAsByte(head.cPrefix) + generateAsByte(head.cSuffix)) +:
+        generateMessageId(head.msgID))).map(_.toByte)
+  }
+
   // TODO: WARNING: TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
+  /**
+   * Sequentially transforms the token, the list of options and the payload into their respective
+   * byte representation (inside of Chunks) and concatenates them as return value.
+   */
   private def generateBody(body: CoapBody): Chunk[Byte] = {
 
     /**
@@ -27,9 +44,13 @@ object CoapGenerationService {
      */
     def generateAllOptions(list: List[CoapOption]): Chunk[Byte] = {
 
+      /**
+       * Forms the header as a singular value and prepends it possible Chunks of extended delta and length
+       * values as well as the related option value.
+       */
       def generateOneOption(option: CoapOption): Chunk[Byte] =
-        (getDeltaFrom(option.delta) + getLengthFrom(option.length)).toByte +:
-          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getValueFrom(option.value))
+        (generateAsByte(option.delta) + generateAsByte(option.length)).toByte +:
+          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.value))
 
       Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
@@ -46,25 +67,16 @@ object CoapGenerationService {
         })
   }
 
-  private def generateHeader(head: CoapHeader): Chunk[Byte] = {
-
-    val firstByte: Int =
-      generateVersion(head.version) + generateType(head.msgType) + generateTokenLength(head.tLength)
-
-    val secondByte: Int = generateCodePrefix(head.cPrefix) + generateCodeSuffix(head.cSuffix)
-
-    val thirdAndFourthByteAsChunk = generateMessageId(head.msgID)
-
-    // TODO: Check whether Chunk is closer to an Array or List performance-wise
-    // most likely Array which means
-    (firstByte +: (secondByte +: thirdAndFourthByteAsChunk)).map(_.toByte)
-  }
-
-  private def getDeltaFrom(delta: CoapOptionDelta): Int =
-    delta.value << 4
-
-  private def getLengthFrom(length: CoapOptionLength): Int =
-    length.value
+  def generateAsByte[A : Extractor](param: A): Int =
+    param match {
+      case CoapOptionDelta  => param.extract << 4
+      case CoapOptionLength => param.extract
+      case CoapVersion      => param.extract << 6
+      case CoapType         => param.extract << 4
+      case CoapTokenLength  => param.extract
+      case CoapCodePrefix   => param.extract << 5
+      case CoapCodeSuffix   => param.extract
+    }
 
   private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
     opt.fold(Chunk[Byte]()) { e =>
@@ -73,18 +85,9 @@ object CoapGenerationService {
     }
 
   // TODO: NOT FULLY IMPLEMENTED
-  private def getValueFrom(v: CoapOptionValue): Chunk[Byte] = v.value
+  private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.value
 
-  private def generateVersion(version: CoapVersion): Int = version.number << 6
-
-  private def generateType(msgType: CoapType): Int = msgType.number << 4
-
-  private def generateTokenLength(length: CoapTokenLength): Int = length.value
-
-  private def generateCodePrefix(prefix: CoapCodePrefix): Int = prefix.number << 5
-
-  private def generateCodeSuffix(suffix: CoapCodeSuffix): Int = suffix.number.toByte
-
+  // TODO: Refactor
   private def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 }
 
