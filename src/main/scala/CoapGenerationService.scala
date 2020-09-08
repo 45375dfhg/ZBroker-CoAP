@@ -9,45 +9,50 @@ import zio.Chunk
  * transported to third parties via a ZIO-NIO channel
  */
 object CoapGenerationService {
-  def generateFromMessage(message: CoapMessage) = {
-
+  def generateFromMessage(message: CoapMessage): Chunk[Byte] = {
+    generateHeader(message.header) ++ generateBody(message.body)
   }
 
-  // TODO: WARNING TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
+  // TODO: WARNING: TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
   private def generateBody(body: CoapBody): Chunk[Byte] = {
 
-    def generateAllOptions(list: List[CoapOption]) = {
+    /**
+     * Transforms all provides internal representations of CoapOptions
+     * into
+     */
+    def generateAllOptions(list: List[CoapOption]): Chunk[Byte] = {
 
-      def generateOneOption(option: CoapOption) = {
+      def generateOneOption(option: CoapOption): Chunk[Byte] = {
 
-        def generateDelta(delta: CoapOptionDelta): Byte =
-          (delta.value << 4).toByte
+        def generateDelta(delta: CoapOptionDelta): Int = delta.value << 4
+        def generateLength(length: CoapOptionLength): Int = length.value
 
-        def generateLength(length: CoapOptionLength): Byte =
-          length.value.toByte
+        def generateExtendedDelta(opt: Option[CoapExtendedDelta]): Chunk[Byte] =
+          opt.fold(Chunk[Byte]()) { ext =>
+            if (ext.value < 269) Chunk(ext.value.toByte)
+            else Chunk(((ext.value >> 8) & 0xFF).toByte, (ext.value & 0xFF).toByte)
+          }
 
-        def generateExtendedDelta(ext: Option[CoapExtendedDelta]): Chunk[Byte] =
-          ext.fold(Chunk.empty)(a => if (a.value < 269) Chunk(a.value.toByte)
-          else Chunk(((a.value >> 8) & 0xFF).toByte,(a.value & 0xFF).toByte))
-
-        def generateExtendedLength(ext: Option[CoapExtendedLength]): Chunk[Byte] =
-          ext.fold(Chunk.empty)(a => if (a.value < 269) Chunk(a.value.toByte)
-          else Chunk(((a.value >> 8) & 0xFF).toByte,(a.value & 0xFF).toByte))
+        def generateExtendedLength(opt: Option[CoapExtendedLength]): Chunk[Byte] =
+          opt.fold(Chunk[Byte]()){ ext =>
+            if (ext.value < 269) Chunk(ext.value.toByte)
+            else Chunk(((ext.value >> 8) & 0xFF).toByte,(ext.value & 0xFF).toByte)
+          }
 
         // TODO: NOT FULLY IMPLEMENTED
-        def generateValue(v: CoapOptionValue) =
-          v.value
+        def generateValue(v: CoapOptionValue): Chunk[Byte] = v.value
 
-        val firstByte =
-          (generateDelta(option.delta)
-        + generateLength(option.length))
+        val firstByte: Byte = (generateDelta(option.delta) + generateLength(option.length)).toByte
 
-        val rest =
+        val rest: Chunk[Byte] =
           generateExtendedDelta(option.exDelta) ++
-          generateExtendedLength(option.exLength)
+          generateExtendedLength(option.exLength) ++
+            generateValue(option.value)
 
-
+        firstByte +: rest
       }
+
+      Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
 
     val token =
@@ -58,7 +63,7 @@ object CoapGenerationService {
 
     val options =
       body.options match {
-        case Some(opts) => opts
+        case Some(opts) => generateAllOptions(opts)
         case None => Chunk.empty
       }
 
@@ -68,27 +73,22 @@ object CoapGenerationService {
         case None => Chunk.empty
       }
 
-    ???
+    token ++ options ++ payload
   }
 
   private def generateHeader(head: CoapHeader): Chunk[Byte] = {
-    def generateVersion(version: CoapVersion): Int =
-      version.number << 6
 
-    def generateType(msgType: CoapType): Int =
-      msgType.number << 4
+    def generateVersion(version: CoapVersion): Int = version.number << 6
 
-    def generateTokenLength(length: CoapTokenLength): Int =
-      length.value
+    def generateType(msgType: CoapType): Int = msgType.number << 4
 
-    def generateCodePrefix(prefix: CoapCodePrefix): Int =
-      prefix.number << 5
+    def generateTokenLength(length: CoapTokenLength): Int = length.value
 
-    def generateCodeSuffix(suffix: CoapCodeSuffix): Int =
-      suffix.number.toByte
+    def generateCodePrefix(prefix: CoapCodePrefix): Int = prefix.number << 5
 
-    def generateMessageId(id: CoapId): Chunk[Int] =
-      Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
+    def generateCodeSuffix(suffix: CoapCodeSuffix): Int = suffix.number.toByte
+
+    def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 
     val firstByte: Int =
       generateVersion(head.version) + generateType(head.msgType) + generateTokenLength(head.tLength)
@@ -97,6 +97,8 @@ object CoapGenerationService {
 
     val thirdAndFourthByteAsChunk = generateMessageId(head.msgID)
 
+    // TODO: Check whether Chunk is closer to an Array or List performance-wise
+    // most likely Array which means
     (firstByte +: (secondByte +: thirdAndFourthByteAsChunk)).map(_.toByte)
   }
 }

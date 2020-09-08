@@ -113,17 +113,17 @@ object CoapExtractionService {
 
   // TODO: Refactor
   private def getDelta(
-    b: Byte,
-    chunk: Chunk[Byte]
+    headerByte: Byte,
+    remainder: Chunk[Byte]
   ): Either[CoapMessageException, (CoapOptionDelta, Option[CoapExtendedDelta], CoapOptionOffset)] =
-    (b & 0xF0) >>> 4 match {
+    (headerByte & 0xF0) >>> 4 match {
       case 13 => for {
-          i <- extractByte(chunk)
+          i <- getFirstByteFrom(remainder)
           d <- CoapOptionDelta(13)
           e <- CoapExtendedDelta(i + 13)
         } yield (d, Some(e), CoapOptionOffset(1))
       case 14 => for {
-          i <- merge2Bytes(chunk.take(2))
+          i <- getFirstTwoBytesAsInt(remainder.take(2))
           d <- CoapOptionDelta(14)
           e <- CoapExtendedDelta(i + 269)
         } yield (d, Some(e), CoapOptionOffset(2))
@@ -136,18 +136,18 @@ object CoapExtractionService {
 
   // TODO: Refactor
   private def getLength(
-    b: Byte,
-    chunk: Chunk[Byte],
-    offset: CoapOptionOffset
+    headerByte: Byte,
+    remainder: Chunk[Byte],
+    deltaOffset: CoapOptionOffset
   ): Either[CoapMessageException, (CoapOptionLength, Option[CoapExtendedLength], CoapOptionOffset)] =
-    b & 0x0F match {
+    headerByte & 0x0F match {
       case 13 => for {
-          i <- extractByte(chunk.drop(offset.value).take(1))
+          i <- getFirstByteFrom(remainder.drop(deltaOffset.value).take(1))
           l <- CoapOptionLength(13)
           e <- CoapExtendedLength(i + 13)
         } yield (l, Some(e), CoapOptionOffset(2))
       case 14 => for {
-          i <- merge2Bytes(chunk.drop(offset.value).take(2))
+          i <- getFirstTwoBytesAsInt(remainder.drop(deltaOffset.value).take(2))
           l <- CoapOptionLength(14)
           e <- CoapExtendedLength(i + 269)
         } yield (l, Some(e), CoapOptionOffset(2))
@@ -165,11 +165,11 @@ object CoapExtractionService {
   ): Either[CoapMessageException, CoapOptionValue] =
     chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).map(CoapOptionValue)
 
-  private def extractByte(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
+  private def getFirstByteFrom(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
   // TODO: Might need & 0xFF added to the first byte
-  private def merge2Bytes(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
+  private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(2).map(chunk => (chunk(0) << 8) | (chunk(1) & 0xFF))
 
   private def getVersion(b: Byte): Either[CoapMessageException, CoapVersion] =
