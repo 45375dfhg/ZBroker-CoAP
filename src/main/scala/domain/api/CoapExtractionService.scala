@@ -79,8 +79,8 @@ object CoapExtractionService {
     }
 
     for {
-      remainder <- chunk.dropExactly(tokenLength)
       t         <- extractToken(chunk)
+      remainder <- chunk.dropExactly(tokenLength)
       token      = if (t.value.nonEmpty) Some(t) else None
       optsPay   <- grabOptions(remainder)
       options    = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
@@ -97,7 +97,7 @@ object CoapExtractionService {
     val optionBody = chunk.drop(1)
 
     for {
-      // extract delta value from header, possibly extend to second and third byte and pass possible offset
+      // extract delta value from header, possibly extend to second and third byte and pass resulting offset
       deltaTriplet  <- getDelta(optionHeader, optionBody)
       (delta, extDelta, deltaOffset) = deltaTriplet
       // extract length value from header, possible extension which depends on the offset of the delta value, pass offset

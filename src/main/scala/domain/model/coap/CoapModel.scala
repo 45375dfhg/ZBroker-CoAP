@@ -126,6 +126,7 @@ object CoapExtendedLength extends CoapBodyParameter {
     Either.cond(13 to 65804 contains value, new CoapExtendedLength(value), InvalidOptionLength(s"${value} is not valid."))
 }
 
+// TODO: Rename?
 final case class CoapOptionOffset (value: Int) extends AnyVal {
   def +(that: CoapOptionOffset): CoapOptionOffset = CoapOptionOffset(value + that.value)
 }

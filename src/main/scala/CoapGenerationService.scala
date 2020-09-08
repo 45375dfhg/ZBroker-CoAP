@@ -16,12 +16,39 @@ object CoapGenerationService {
   // TODO: WARNING TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
   private def generateBody(body: CoapBody): Chunk[Byte] = {
 
-    def generateAllOptions(list: List[CoapOption]) = ???
+    def generateAllOptions(list: List[CoapOption]) = {
 
-    def generateOneOption(option: CoapOption) = ???
+      def generateOneOption(option: CoapOption) = {
 
-    def generateDelta(delta: CoapOptionDelta): Byte = ???
+        def generateDelta(delta: CoapOptionDelta): Byte =
+          (delta.value << 4).toByte
 
+        def generateLength(length: CoapOptionLength): Byte =
+          length.value.toByte
+
+        def generateExtendedDelta(ext: Option[CoapExtendedDelta]): Chunk[Byte] =
+          ext.fold(Chunk.empty)(a => if (a.value < 269) Chunk(a.value.toByte)
+          else Chunk(((a.value >> 8) & 0xFF).toByte,(a.value & 0xFF).toByte))
+
+        def generateExtendedLength(ext: Option[CoapExtendedLength]): Chunk[Byte] =
+          ext.fold(Chunk.empty)(a => if (a.value < 269) Chunk(a.value.toByte)
+          else Chunk(((a.value >> 8) & 0xFF).toByte,(a.value & 0xFF).toByte))
+
+        // TODO: NOT FULLY IMPLEMENTED
+        def generateValue(v: CoapOptionValue) =
+          v.value
+
+        val firstByte =
+          (generateDelta(option.delta)
+        + generateLength(option.length))
+
+        val rest =
+          generateExtendedDelta(option.exDelta) ++
+          generateExtendedLength(option.exLength)
+
+
+      }
+    }
 
     val token =
       body.token match {
@@ -45,36 +72,32 @@ object CoapGenerationService {
   }
 
   private def generateHeader(head: CoapHeader): Chunk[Byte] = {
-    def generateVersion(version: CoapVersion): Byte =
-      (version.number << 6).toByte
+    def generateVersion(version: CoapVersion): Int =
+      version.number << 6
 
-    def generateType(msgType: CoapType): Byte =
-      (msgType.number << 4).toByte
+    def generateType(msgType: CoapType): Int =
+      msgType.number << 4
 
-    def generateTokenLength(length: CoapTokenLength): Byte =
-      length.value.toByte
+    def generateTokenLength(length: CoapTokenLength): Int =
+      length.value
 
-    def generateCodePrefix(prefix: CoapCodePrefix): Byte =
-      (prefix.number << 5).toByte
+    def generateCodePrefix(prefix: CoapCodePrefix): Int =
+      prefix.number << 5
 
-    def generateCodeSuffix(suffix: CoapCodeSuffix): Byte =
+    def generateCodeSuffix(suffix: CoapCodeSuffix): Int =
       suffix.number.toByte
 
-    def generateMessageId(id: CoapId): Chunk[Byte] =
-      Chunk(((id.value >> 8) & 0xFF).toByte,(id.value & 0xFF).toByte)
+    def generateMessageId(id: CoapId): Chunk[Int] =
+      Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 
-    val firstByte =
-      generateVersion(head.version)
-    + generateType(head.msgType)
-    + generateTokenLength(head.tLength)
+    val firstByte: Int =
+      generateVersion(head.version) + generateType(head.msgType) + generateTokenLength(head.tLength)
 
-    val secondByte: Byte =
-      generateCodePrefix(head.cPrefix)
-    + generateCodeSuffix(head.cSuffix)
+    val secondByte: Int = generateCodePrefix(head.cPrefix) + generateCodeSuffix(head.cSuffix)
 
-    val thirdAndFourthChunk = generateMessageId(head.msgID)
+    val thirdAndFourthByteAsChunk = generateMessageId(head.msgID)
 
-    firstByte +: (secondByte +: thirdAndFourthChunk)
+    (firstByte +: (secondByte +: thirdAndFourthByteAsChunk)).map(_.toByte)
   }
 }
 
