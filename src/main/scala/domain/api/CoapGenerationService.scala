@@ -1,10 +1,7 @@
-package root
+package domain.api
 
 import domain.model.coap._
-
 import utility.Extractor
-import utility.Extractor._
-
 import zio.Chunk
 
 /**
@@ -59,26 +56,26 @@ object CoapGenerationService {
       case Some(t) => t.value
       case None => Chunk.empty
     }) ++ (body.options match {
-        case Some(opts) => generateAllOptions(opts)
-        case None => Chunk.empty
-      }) ++ (body.payload match {
-          case Some(pay) => pay.value
-          case None => Chunk.empty
-        })
+      case Some(opts) => generateAllOptions(opts)
+      case None => Chunk.empty
+    }) ++ (body.payload match {
+      case Some(pay) => pay.value
+      case None => Chunk.empty
+    })
   }
 
-  def generateAsByte[A : Extractor](param: A): Int =
+  def generateAsByte[A: Extractor](param: A): Int =
     param match {
-      case CoapOptionDelta  => param.extract << 4
+      case CoapOptionDelta => param.extract << 4
       case CoapOptionLength => param.extract
-      case CoapVersion      => param.extract << 6
-      case CoapType         => param.extract << 4
-      case CoapTokenLength  => param.extract
-      case CoapCodePrefix   => param.extract << 5
-      case CoapCodeSuffix   => param.extract
+      case CoapVersion => param.extract << 6
+      case CoapType => param.extract << 4
+      case CoapTokenLength => param.extract
+      case CoapCodePrefix => param.extract << 5
+      case CoapCodeSuffix => param.extract
     }
 
-  private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
+  private def getExtensionFrom[A: Extractor](opt: Option[A]): Chunk[Byte] =
     opt.fold(Chunk[Byte]()) { e =>
       if (e.extract < 269) Chunk(e.extract.toByte)
       else Chunk(((e.extract >> 8) & 0xFF).toByte, (e.extract & 0xFF).toByte)
@@ -90,4 +87,3 @@ object CoapGenerationService {
   // TODO: Refactor
   private def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 }
-
