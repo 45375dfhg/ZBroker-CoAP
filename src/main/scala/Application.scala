@@ -19,7 +19,7 @@ object Application extends App {
         ChunkStreamRepository
           .getChunkStream
           //.tap(b => putStrLn(b._2.toString))
-          .mapM(e => CoapExtractionService.extractFromChunk(e._2))
+          .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) }).drop(1000000).take(1)
           //.tap(a => putStrLn(a.toString)),
         , OutgoingStream.send)
     } yield ()).runDrain

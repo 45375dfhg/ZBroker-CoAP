@@ -1,7 +1,10 @@
 package domain.api
 
 import domain.model.coap._
+
 import utility.Extractor
+import utility.Extractor._
+
 import zio.Chunk
 
 /**
@@ -64,18 +67,18 @@ object CoapGenerationService {
     })
   }
 
-  def generateAsByte[A: Extractor](param: A): Int =
+  def generateAsByte[A : Extractor](param: A): Int =
     param match {
-      case CoapOptionDelta => param.extract << 4
+      case CoapOptionDelta  => param.extract << 4
       case CoapOptionLength => param.extract
-      case CoapVersion => param.extract << 6
-      case CoapType => param.extract << 4
-      case CoapTokenLength => param.extract
-      case CoapCodePrefix => param.extract << 5
-      case CoapCodeSuffix => param.extract
+      case CoapVersion      => param.extract << 6
+      case CoapType         => param.extract << 4
+      case CoapTokenLength  => param.extract
+      case CoapCodePrefix   => param.extract << 5
+      case CoapCodeSuffix   => param.extract
     }
 
-  private def getExtensionFrom[A: Extractor](opt: Option[A]): Chunk[Byte] =
+  private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
     opt.fold(Chunk[Byte]()) { e =>
       if (e.extract < 269) Chunk(e.extract.toByte)
       else Chunk(((e.extract >> 8) & 0xFF).toByte, (e.extract & 0xFF).toByte)

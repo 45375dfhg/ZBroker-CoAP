@@ -105,7 +105,7 @@ object CoapExtractionService {
       (length, extLength, lengthOffset) = lengthTriplet
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
       value       <- getValue(optionBody, length, deltaOffset + lengthOffset)
-      number       = CoapOptionNumber(num + delta.value)
+      number      <- CoapOptionNumber(num + delta.value)
       // offset can be understood as the size of the parameter group
       offset       = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
     } yield CoapOption(delta, extDelta, length, extLength, value, number, offset)
@@ -115,17 +115,17 @@ object CoapExtractionService {
   private def getDelta(
     headerByte: Byte,
     remainder: Chunk[Byte]
-  ): Either[CoapMessageException, (CoapOptionDelta, Option[CoapExtendedDelta], CoapOptionOffset)] =
+  ): Either[CoapMessageException, (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)] =
     (headerByte & 0xF0) >>> 4 match {
       case 13 => for {
           i <- getFirstByteFrom(remainder)
           d <- CoapOptionDelta(13)
-          e <- CoapExtendedDelta(i + 13)
+          e <- CoapOptionExtendedDelta(i + 13)
         } yield (d, Some(e), CoapOptionOffset(1))
       case 14 => for {
           i <- getFirstTwoBytesAsInt(remainder.take(2))
           d <- CoapOptionDelta(14)
-          e <- CoapExtendedDelta(i + 269)
+          e <- CoapOptionExtendedDelta(i + 269)
         } yield (d, Some(e), CoapOptionOffset(2))
       case 15 => Left(InvalidOptionDelta("15 is a reserved value."))
       case other if 0 to 12 contains other => for {
@@ -139,17 +139,17 @@ object CoapExtractionService {
     headerByte: Byte,
     remainder: Chunk[Byte],
     deltaOffset: CoapOptionOffset
-  ): Either[CoapMessageException, (CoapOptionLength, Option[CoapExtendedLength], CoapOptionOffset)] =
+  ): Either[CoapMessageException, (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)] =
     headerByte & 0x0F match {
       case 13 => for {
           i <- getFirstByteFrom(remainder.drop(deltaOffset.value).take(1))
           l <- CoapOptionLength(13)
-          e <- CoapExtendedLength(i + 13)
+          e <- CoapOptionExtendedLength(i + 13)
         } yield (l, Some(e), CoapOptionOffset(2))
       case 14 => for {
           i <- getFirstTwoBytesAsInt(remainder.drop(deltaOffset.value).take(2))
           l <- CoapOptionLength(14)
-          e <- CoapExtendedLength(i + 269)
+          e <- CoapOptionExtendedLength(i + 269)
         } yield (l, Some(e), CoapOptionOffset(2))
       case 15 => Left(InvalidOptionLength("15 is a reserved length value."))
       case other if 0 to 12 contains other => for {
@@ -158,6 +158,7 @@ object CoapExtractionService {
       case e => Left(InvalidOptionLength(s"Illegal length value of $e. Initial value must be between 0 and 15"))
     }
 
+  // TODO: REDO
   private def getValue(
     chunk: Chunk[Byte],
     length: CoapOptionLength,
