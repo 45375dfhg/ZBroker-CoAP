@@ -1,10 +1,10 @@
 package domain.api
 
-import domain.model.coap._
+import java.nio.ByteBuffer
 
+import domain.model.coap._
 import utility.Extractor
 import utility.Extractor._
-
 import zio.Chunk
 
 /**
@@ -85,7 +85,12 @@ object CoapGenerationService {
     }
 
   // TODO: NOT FULLY IMPLEMENTED
-  private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.value
+  private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.content match {
+    case c : IntContent    => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+    case c : StringContent => Chunk.fromArray(c.value.map(_.toByte).toArray)
+    case c : OpaqueContent => c.value
+    case c : EmptyContent  => c.value
+  }
 
   // TODO: Refactor
   private def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
