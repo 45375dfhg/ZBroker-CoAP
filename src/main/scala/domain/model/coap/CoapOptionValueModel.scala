@@ -10,16 +10,10 @@ import zio.Chunk
 
 import scala.collection.immutable.HashMap
 
-final case class CoapOptionValue private(
-  number: CoapOptionNumber,
-  content: Content
-)
+final case class CoapOptionValue private(number: CoapOptionNumber, content: Content)
 
 object CoapOptionValue {
-  def apply(
-    number: CoapOptionNumber,
-    raw: Chunk[Byte]
-  ): Either[CoapMessageException, CoapOptionValue] = {
+  def apply(number: CoapOptionNumber, raw: Chunk[Byte]): Either[CoapMessageException, CoapOptionValue] = {
     val range = number.getOptionLengthRange
     (number.getOptionFormat match {
       case IntFormat    => IntContent(raw, range)
@@ -44,6 +38,17 @@ final case class CoapOptionNumber private(value: Int) extends AnyVal { self =>
 }
 
 object CoapOptionNumber {
+
+  def getFormat(number: CoapOptionNumber): CoapOptionFormat =
+    format(number.value)._1
+
+  /**
+   * Returns a quadruple of Booleans that represent the properties
+   * Critical, Unsafe, NoCacheKey and Repeatable in the given order for the
+   * given CoapOptionNumber
+   */
+  def getProperties(number: CoapOptionNumber) =
+    properties(number.value)
 
   private val format: HashMap[Int, (CoapOptionFormat, Range)] = HashMap(
     1  -> (OpaqueFormat, 0 to 8),

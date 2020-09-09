@@ -5,6 +5,7 @@ import utility.ChunkExtension._
 import zio.{Chunk, UIO, ZIO}
 
 import scala.annotation.tailrec
+import scala.collection.immutable.HashMap
 
 /**
  * This service provides the functionality to extract CoAP parameters from Chunk[Byte]
@@ -56,11 +57,12 @@ object CoapExtractionService {
     // extract the token and continue with the remainder
     val tokenLength = header.tLength.value
 
+    // makes use of the tokenLength defined above
     def extractToken(chunk: Chunk[Byte]): Either[CoapMessageException, CoapToken] =
       chunk.takeExactly(tokenLength).map(CoapToken)
 
     @tailrec
-    def grabOptions(
+    def grabOptionsAsList(
         rem: Chunk[Byte],
         acc: List[CoapOption] = List.empty,
         num: Int = 0
@@ -68,7 +70,7 @@ object CoapExtractionService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(r) => grabOptions(rem.drop(r.offset.value), r :: acc, num + r.value.number.value)
+            case Right(r) => grabOptionsAsList(rem.drop(r.offset.value), r :: acc, num + r.value.number.value)
             case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
@@ -78,13 +80,26 @@ object CoapExtractionService {
         }
     }
 
+    /**
+     * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via
+     * its CoapOptionNumber. This might be required in situations where there is a direct check
+     * for the existence of an option - probably an overkill anyway.
+     */
+    def convertOptionListToMap(list: List[CoapOption]): HashMap[CoapOptionNumber, List[CoapOption]] =
+      list.foldRight(HashMap[CoapOptionNumber, List[CoapOption]]()) { (c, acc) =>
+        val number = c.value.number
+        if (acc.isDefinedAt(number))
+          if (CoapOptionNumber.getProperties(number)._4) acc + (number -> (c :: acc(number)))
+          else acc
+        else acc + (number -> List(c))
+      }
 
     // sequentially extract the token, then all the options and lastly get the payload
     for {
       t         <- extractToken(chunk)
       remainder <- chunk.dropExactly(tokenLength)
       token      = if (t.value.nonEmpty) Some(t) else None
-      optsPay   <- grabOptions(remainder)
+      optsPay   <- grabOptionsAsList(remainder)
       options    = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
       payload    = optsPay._2 // TODO: construct payload based on option
     } yield CoapBody(token, options, payload)
@@ -166,9 +181,7 @@ object CoapExtractionService {
     offset: CoapOptionOffset,
     number: CoapOptionNumber
   ): Either[CoapMessageException, CoapOptionValue] =
-    chunk.dropExactly(offset.value)
-      .flatMap(_.takeExactly(length.value))
-      .flatMap(CoapOptionValue(number, _))
+    chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).flatMap(CoapOptionValue(number, _))
 
   private def getFirstByteFrom(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
