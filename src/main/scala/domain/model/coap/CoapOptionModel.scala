@@ -10,7 +10,7 @@ final case class CoapOption(
   length   : CoapOptionLength, // internal!
   exLength : Option[CoapOptionExtendedLength],
   value    : CoapOptionValue,
-  number   : CoapOptionNumber, // questionable TODO: remove
+  // number   : CoapOptionNumber, // questionable TODO: remove
   offset   : CoapOptionOffset  // same
 )
 

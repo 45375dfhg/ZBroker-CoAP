@@ -95,21 +95,21 @@ case object EmptyFormat  extends CoapOptionFormat
 
 sealed trait Content
 
-final case class IntContent private(value: Int) extends AnyVal with Content
+final case class IntContent private(value: Int) extends Content
 object IntContent {
   def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
     Either.cond(range contains raw.size, new IntContent(ByteBuffer.wrap(raw.toArray).getInt), InvalidCoapOptionLength)
   }
 }
 
-final case class StringContent private(value: String) extends AnyVal with Content
+final case class StringContent private(value: String) extends Content
 object StringContent {
   def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
     Either.cond(range contains raw.size, new StringContent(raw.map(_.toChar).mkString), InvalidCoapOptionLength)
   }
 }
 
-final case class OpaqueContent private(value: Chunk[Byte]) extends AnyVal with Content
+final case class OpaqueContent private(value: Chunk[Byte]) extends Content
 object OpaqueContent {
   def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
     Either.cond(range contains raw.size, new OpaqueContent(raw), InvalidCoapOptionLength)

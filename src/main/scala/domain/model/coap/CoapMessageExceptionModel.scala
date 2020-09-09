@@ -16,3 +16,4 @@ final case class InvalidOptionValue (err: String)              extends CoapMessa
 case object InvalidPayloadMarker                               extends CoapMessageException
 case object InvalidCoapChunkSize                               extends CoapMessageException
 case object InvalidCoapOptionNumber                            extends CoapMessageException
+case object InvalidCoapOptionLength                            extends CoapMessageException

@@ -68,8 +68,8 @@ object CoapExtractionService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(result) => grabOptions(rem.drop(result.offset.value), result :: acc, num + result.number.value)
-            case Left(err)     => Left(err)
+            case Right(r) => grabOptions(rem.drop(r.offset.value), r :: acc, num + r.value.number.value)
+            case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
           case Some(_) => if (rem.tail.nonEmpty) Right(acc, Some(CoapPayload(rem.drop(1))))
@@ -78,13 +78,15 @@ object CoapExtractionService {
         }
     }
 
+
+    // sequentially extract the token, then all the options and lastly get the payload
     for {
       t         <- extractToken(chunk)
       remainder <- chunk.dropExactly(tokenLength)
       token      = if (t.value.nonEmpty) Some(t) else None
       optsPay   <- grabOptions(remainder)
       options    = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
-      payload    = optsPay._2
+      payload    = optsPay._2 // TODO: construct payload based on option
     } yield CoapBody(token, options, payload)
   }
 
@@ -104,11 +106,11 @@ object CoapExtractionService {
       lengthTriplet <- getLength(optionHeader, optionBody, deltaOffset)
       (length, extLength, lengthOffset) = lengthTriplet
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
-      value       <- getValue(optionBody, length, deltaOffset + lengthOffset)
-      number      <- CoapOptionNumber(num + delta.value)
+      number        <- CoapOptionNumber(num + delta.value)
+      value         <- getValue(optionBody, length, deltaOffset + lengthOffset, number)
       // offset can be understood as the size of the parameter group
-      offset       = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
-    } yield CoapOption(delta, extDelta, length, extLength, value, number, offset)
+      offset         = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
+    } yield CoapOption(delta, extDelta, length, extLength, value, offset)
   }
 
   // TODO: Refactor
@@ -158,20 +160,22 @@ object CoapExtractionService {
       case e => Left(InvalidOptionLength(s"Illegal length value of $e. Initial value must be between 0 and 15"))
     }
 
-  // TODO: REDO
   private def getValue(
     chunk: Chunk[Byte],
     length: CoapOptionLength,
-    offset: CoapOptionOffset
+    offset: CoapOptionOffset,
+    number: CoapOptionNumber
   ): Either[CoapMessageException, CoapOptionValue] =
-    chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).map(CoapOptionValue)
+    chunk.dropExactly(offset.value)
+      .flatMap(_.takeExactly(length.value))
+      .flatMap(CoapOptionValue(number, _))
 
   private def getFirstByteFrom(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
   // TODO: Might need & 0xFF added to the first byte
   private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
-    bytes.takeExactly(2).map(chunk => (chunk(0) << 8) | (chunk(1) & 0xFF))
+    bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
 
   private def getVersion(b: Byte): Either[CoapMessageException, CoapVersion] =
     CoapVersion((b & 0xF0) >>> 6)
