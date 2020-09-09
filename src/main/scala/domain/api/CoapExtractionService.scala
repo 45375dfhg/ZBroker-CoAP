@@ -54,13 +54,17 @@ object CoapExtractionService {
    * @return Either a CoapBody or an Exception
    */
   private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): Either[CoapMessageException, CoapBody] = {
-    // extract the token and continue with the remainder
-    val tokenLength = header.tLength.value
 
-    // makes use of the tokenLength defined above
-    def extractToken(chunk: Chunk[Byte]): Either[CoapMessageException, CoapToken] =
-      chunk.takeExactly(tokenLength).map(CoapToken)
-
+    /**
+     * Recursively iterates over the chunk. It checks the current head for existence and on existence whether the
+     * head is equal to the payload marker.
+     *
+     * @param rem the remainder of the Chunk[Byte] which is also the remainder of Datagram as a whole. The initial value
+     *            should be the whole Datagram excluding the Header as well as the Token.
+     * @param acc the accumulator that holds the Options that were gathered so far.
+     * @param num a tracker for the sum of all deltas and therefore the last accessed option number
+     * @return Either an exception or a list of all options and possibly a payload in an option monad
+     */
     @tailrec
     def grabOptionsAsList(
         rem: Chunk[Byte],
@@ -94,7 +98,31 @@ object CoapExtractionService {
         else acc + (number -> List(c))
       }
 
-    // sequentially extract the token, then all the options and lastly get the payload
+    /**
+     * As long as the number of options per message are low the function complexity does not matter in comparison
+     * to the overhead and therefore this is preferable to an HashMap solution
+     */
+    def findContentType(list: List[CoapOption]): CoapPayloadContentFormat =
+      list.find(_.value.number.value == 12) match {
+        case Some(n) => n match {
+          case 0  => TextFormat
+          case 40 => LinkFormat
+          case 41 => XMLFormat
+          case 42 => OctetStreamFormat
+          case 47 => EXIFormat
+          case 50 => JSONFormat
+        }
+        case None    => SniffingFormat
+      }
+
+    // extract the token and continue with the remainder
+    val tokenLength = header.tLength.value
+
+    // makes use of the tokenLength defined above
+    def extractToken(chunk: Chunk[Byte]): Either[CoapMessageException, CoapToken] =
+      chunk.takeExactly(tokenLength).map(CoapToken)
+
+    // sequentially extract the token, then all the options and lastly gets the payload
     for {
       t         <- extractToken(chunk)
       remainder <- chunk.dropExactly(tokenLength)
