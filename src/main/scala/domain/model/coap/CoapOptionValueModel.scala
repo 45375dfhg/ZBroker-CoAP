@@ -4,33 +4,48 @@ package domain.model.coap
  * The entry point is in {{{CoapMessage}}}
  */
 
+import java.nio.ByteBuffer
+
 import zio.Chunk
 
 import scala.collection.immutable.HashMap
 
-final case class CoapOptionValue(
+final case class CoapOptionValue private(
   number: CoapOptionNumber,
-  critical: Critical,
-  unsafe: Unsafe,
-  noCacheKey: NoCacheKey,
-  repeatable: Repeatable,
   content: Content
 )
+
+object CoapOptionValue {
+  def apply(
+    number: CoapOptionNumber,
+    raw: Chunk[Byte]
+  ): Either[CoapMessageException, CoapOptionValue] = {
+    val range = number.getOptionLengthRange
+    (number.getOptionFormat match {
+      case IntFormat    => IntContent(raw, range)
+      case StringFormat => StringContent(raw, range)
+      case OpaqueFormat => OpaqueContent(raw, range)
+      case EmptyFormat  => EmptyContent(raw)
+    }).map(content => CoapOptionValue(number, content))
+  }
+}
 
 final case class CoapOptionNumber private(value: Int) extends AnyVal { self =>
   import CoapOptionNumber._
 
   def getOptionFormat: CoapOptionFormat =
-    map(self.value)._1
+    format(self.value)._1
 
-  def getOptionMaxLength: Range =
-    map(self.value)._2
+  def getOptionLengthRange: Range =
+    format(self.value)._2
+
+  def getOptionProperties: (Boolean, Boolean, Boolean, Boolean) =
+    properties(self.value)
 }
 
 object CoapOptionNumber {
 
-  // TODO: Add C-U-N-R parameters to the value
-  val map: HashMap[Int, (CoapOptionFormat, Range)] = HashMap(
+  private val format: HashMap[Int, (CoapOptionFormat, Range)] = HashMap(
     1  -> (OpaqueFormat, 0 to 8),
     3  -> (StringFormat, 1 to 255),
     4  -> (OpaqueFormat, 1 to 8),
@@ -48,7 +63,25 @@ object CoapOptionNumber {
     60 -> (IntFormat,    0 to 4)
   )
 
-  val numbers = map.keySet
+  private val properties = HashMap(
+    1  -> (true,  false, false, true),
+    3  -> (true,  true,  false, false),
+    4  -> (false, false, false, true),
+    5  -> (true,  false, false, true),
+    7  -> (true,  true,  false, false),
+    8  -> (false, false, false, true),
+    11 -> (true,  true,  false, true),
+    12 -> (false, false, false, false),
+    14 -> (false, true,  false, false),
+    15 -> (true,  true,  false, true),
+    17 -> (true,  false, false, false),
+    20 -> (false, false, false, true),
+    35 -> (true,  true,  false, false),
+    39 -> (true,  true,  false, false),
+    60 -> (false, false, true,  true)
+  )
+
+  val numbers = format.keySet
 
   def apply(value: Int): Either[CoapMessageException, CoapOptionNumber] =
     Either.cond(numbers contains value, new CoapOptionNumber(value), InvalidCoapOptionNumber)
@@ -61,10 +94,35 @@ case object OpaqueFormat extends CoapOptionFormat
 case object EmptyFormat  extends CoapOptionFormat
 
 sealed trait Content
-final case class IntContent(value: Int)            extends Content
-final case class StringContent(value: String)      extends Content
-final case class OpaqueContent(value: Chunk[Byte]) extends Content
-case object      EmptyContent                      extends Content
+
+final case class IntContent private(value: Int) extends AnyVal with Content
+object IntContent {
+  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
+    Either.cond(range contains raw.size, new IntContent(ByteBuffer.wrap(raw.toArray).getInt), InvalidCoapOptionLength)
+  }
+}
+
+final case class StringContent private(value: String) extends AnyVal with Content
+object StringContent {
+  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
+    Either.cond(range contains raw.size, new StringContent(raw.map(_.toChar).mkString), InvalidCoapOptionLength)
+  }
+}
+
+final case class OpaqueContent private(value: Chunk[Byte]) extends AnyVal with Content
+object OpaqueContent {
+  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
+    Either.cond(range contains raw.size, new OpaqueContent(raw), InvalidCoapOptionLength)
+  }
+}
+
+// TODO: Refactor - this should be a case object instead.
+final case class EmptyContent private(value: Chunk[Byte]) extends Content
+object EmptyContent {
+  def apply(raw: Chunk[Byte]): Either[CoapMessageException, Content] = {
+    Either.cond(raw.isEmpty, new EmptyContent(Chunk[Byte]()), InvalidCoapOptionLength)
+  }
+}
 
 final case class Critical(value: Boolean)   extends AnyVal
 final case class Unsafe(value: Boolean)     extends AnyVal
