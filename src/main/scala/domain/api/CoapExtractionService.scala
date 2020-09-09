@@ -70,7 +70,7 @@ object CoapExtractionService {
         rem: Chunk[Byte],
         acc: List[CoapOption] = List.empty,
         num: Int = 0
-      ): Either[CoapMessageException, (List[CoapOption], Option[CoapPayload])] = {
+      ): Either[CoapMessageException, (List[CoapOption], Option[Chunk[Byte]])] = {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
@@ -78,42 +78,11 @@ object CoapExtractionService {
             case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
-          case Some(_) => if (rem.tail.nonEmpty) Right(acc, Some(CoapPayload(rem.drop(1))))
+          case Some(_) => if (rem.tail.nonEmpty) Right(acc, Some(rem.drop(1)))
                           else Left(InvalidPayloadMarker)
           case None    => Right(acc, None)
         }
     }
-
-    /**
-     * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via
-     * its CoapOptionNumber. This might be required in situations where there is a direct check
-     * for the existence of an option - probably an overkill anyway.
-     */
-    def convertOptionListToMap(list: List[CoapOption]): HashMap[CoapOptionNumber, List[CoapOption]] =
-      list.foldRight(HashMap[CoapOptionNumber, List[CoapOption]]()) { (c, acc) =>
-        val number = c.value.number
-        if (acc.isDefinedAt(number))
-          if (CoapOptionNumber.getProperties(number)._4) acc + (number -> (c :: acc(number)))
-          else acc
-        else acc + (number -> List(c))
-      }
-
-    /**
-     * As long as the number of options per message are low the function complexity does not matter in comparison
-     * to the overhead and therefore this is preferable to an HashMap solution
-     */
-    def findContentType(list: List[CoapOption]): CoapPayloadContentFormat =
-      list.find(_.value.number.value == 12) match {
-        case Some(n) => n match {
-          case 0  => TextFormat
-          case 40 => LinkFormat
-          case 41 => XMLFormat
-          case 42 => OctetStreamFormat
-          case 47 => EXIFormat
-          case 50 => JSONFormat
-        }
-        case None    => SniffingFormat
-      }
 
     // extract the token and continue with the remainder
     val tokenLength = header.tLength.value
@@ -129,7 +98,8 @@ object CoapExtractionService {
       token      = if (t.value.nonEmpty) Some(t) else None
       optsPay   <- grabOptionsAsList(remainder)
       options    = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
-      payload    = optsPay._2 // TODO: construct payload based on option
+      payloadF   = findContentType(options)
+      payload    = getPayload(optsPay._2, payloadF)
     } yield CoapBody(token, options, payload)
   }
 
@@ -214,7 +184,7 @@ object CoapExtractionService {
   private def getFirstByteFrom(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
-  // TODO: Might need & 0xFF added to the first byte
+  // TODO: 0xFF necessary?
   private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
 
@@ -235,6 +205,50 @@ object CoapExtractionService {
 
   private def getMsgId(third: Byte, fourth: Byte): Either[CoapMessageException, CoapId] =
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
+
+  /**
+   * As long as the number of options per message are low the function complexity does not matter in comparison
+   * to the overhead and therefore this is preferable to an HashMap solution
+   */
+  private def findContentType(list: Option[List[CoapOption]]): CoapPayloadContentFormat =
+    list match {
+      case Some(l) => l.find(_.value.number.value == 12) match {
+        case Some(n) => n.value.number.value match {
+          case 0  => TextFormat
+          case 40 => LinkFormat
+          case 41 => XMLFormat
+          case 42 => OctetStreamFormat
+          case 47 => EXIFormat
+          case 50 => JSONFormat
+        }
+        case None => SniffingFormat
+      }
+      case None => SniffingFormat
+    }
+
+  private def getPayload(chunk: Option[Chunk[Byte]], payloadFormat: CoapPayloadContentFormat): Option[CoapPayload] = {
+    chunk match {
+      case Some(c) => payloadFormat match {
+        case TextFormat => Some(CoapPayload(TextPayload(c)))
+        case _          => None
+      }
+      case None    => None
+    }
+  }
+
+  /**
+   * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via
+   * its CoapOptionNumber. This might be required in situations where there is a direct check
+   * for the existence of an option - probably an overkill anyway.
+   */
+  private def convertOptionListToMap(list: List[CoapOption]): HashMap[CoapOptionNumber, List[CoapOption]] =
+    list.foldRight(HashMap[CoapOptionNumber, List[CoapOption]]()) { (c, acc) =>
+      val number = c.value.number
+      if (acc.isDefinedAt(number))
+        if (CoapOptionNumber.getProperties(number)._4) acc + (number -> (c :: acc(number)))
+        else acc
+      else acc + (number -> List(c))
+    }
 }
 
 

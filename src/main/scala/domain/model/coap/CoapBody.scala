@@ -14,4 +14,3 @@ final case class CoapBody(
 
 final case class CoapToken(value: Chunk[Byte])
 
-final case class CoapPayload(value: Chunk[Byte])

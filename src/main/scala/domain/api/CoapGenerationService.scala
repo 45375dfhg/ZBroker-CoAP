@@ -55,6 +55,9 @@ object CoapGenerationService {
       Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
 
+    // TODO: IMPLEMENT
+    def generatePayload = ???
+
     (body.token match {
       case Some(t) => t.value
       case None => Chunk.empty
@@ -62,7 +65,7 @@ object CoapGenerationService {
       case Some(opts) => generateAllOptions(opts)
       case None => Chunk.empty
     }) ++ (body.payload match {
-      case Some(pay) => pay.value
+      case Some(pay) => pay.payload
       case None => Chunk.empty
     })
   }
