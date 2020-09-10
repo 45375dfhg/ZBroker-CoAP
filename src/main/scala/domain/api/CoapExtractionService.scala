@@ -231,7 +231,7 @@ object CoapExtractionService {
   private def getPayload(chunk: Option[Chunk[Byte]], payloadMediaType: CoapPayloadMediaTypes): Option[CoapPayload] = {
     chunk match {
       case Some(c) => payloadMediaType match {
-        case TextMediaType => Some(CoapPayload(payloadMediaType, TextPayload(c)))
+        case TextMediaType => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c)))
         case _             => None
       }
       case None    => None

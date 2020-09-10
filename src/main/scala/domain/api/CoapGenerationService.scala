@@ -55,8 +55,11 @@ object CoapGenerationService {
       Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
 
-    // TODO: IMPLEMENT
-    def generatePayload = ???
+    // TODO: IMPLEMENT the other payload types
+    def generatePayload(payload: CoapPayloadContent): Chunk[Byte] = payload match {
+      case p : TextCoapPayloadContent => Chunk.fromArray(p.value.map(_.toByte).toArray)
+      case _ => Chunk[Byte]()
+    }
 
     (body.token match {
       case Some(t) => t.value
@@ -65,7 +68,7 @@ object CoapGenerationService {
       case Some(opts) => generateAllOptions(opts)
       case None => Chunk.empty
     }) ++ (body.payload match {
-      case Some(pay) => pay.payload
+      case Some(pay) => generatePayload(pay.payloadContent)
       case None => Chunk.empty
     })
   }

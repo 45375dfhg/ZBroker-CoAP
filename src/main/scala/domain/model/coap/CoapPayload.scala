@@ -2,11 +2,13 @@ package domain.model.coap
 
 import zio.Chunk
 
-final case class CoapPayload(coapPayloadContentFormat: CoapPayloadMediaTypes, payload: Payload)
+final case class CoapPayload(coapPayloadContentFormat: CoapPayloadMediaTypes, payloadContent: CoapPayloadContent)
 
-sealed trait Payload
+sealed trait CoapPayloadContent
 
-final case class TextPayload private(value: String) extends Payload
-object TextPayload {
-  def apply(chunk: Chunk[Byte]): TextPayload = new TextPayload(chunk.map(_.toChar).mkString)
+final case class TextCoapPayloadContent private(value: String) extends CoapPayloadContent
+object TextCoapPayloadContent {
+  def apply(chunk: Chunk[Byte]): TextCoapPayloadContent = new TextCoapPayloadContent(chunk.map(_.toChar).mkString)
 }
+
+// TODO: Implement the other Media Types
