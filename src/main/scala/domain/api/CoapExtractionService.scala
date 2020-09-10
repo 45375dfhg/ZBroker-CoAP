@@ -74,13 +74,13 @@ object CoapExtractionService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(r) => grabOptionsAsList(rem.drop(r.offset.value), r :: acc, num + r.value.number.value)
+            case Right(r) => grabOptionsAsList(rem.drop(r.offset.value), r :: acc, r.value.number.value)
             case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
-          case Some(_) => if (rem.tail.nonEmpty) Right(acc, Some(rem.drop(1)))
+          case Some(_) => if (rem.tail.nonEmpty) Right(acc.reverse, Some(rem.drop(1)))
                           else Left(InvalidPayloadMarker)
-          case None    => Right(acc, None)
+          case None    => Right(acc.reverse, None)
         }
     }
 
@@ -110,7 +110,6 @@ object CoapExtractionService {
   ): Either[CoapMessageException, CoapOption] = {
     // option header is always one byte - empty check happens during parameter extraction
     val optionBody = chunk.drop(1)
-
     for {
       // extract delta value from header, possibly extend to second and third byte and pass resulting offset
       deltaTriplet  <- getDelta(optionHeader, optionBody)
@@ -222,6 +221,7 @@ object CoapExtractionService {
                       case 42 => OctetStreamMediaType
                       case 47 => EXIMediaType
                       case 50 => JSONMediaType
+                      case _  => SniffingMediaType
             }
           case _ => SniffingMediaType
         }
@@ -234,8 +234,9 @@ object CoapExtractionService {
   private def getPayload(chunk: Option[Chunk[Byte]], payloadMediaType: CoapPayloadMediaTypes): Option[CoapPayload] = {
     chunk match {
       case Some(c) => payloadMediaType match {
-        case TextMediaType => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c)))
-        case _             => None
+        case TextMediaType     => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c)))
+        case SniffingMediaType => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c))) // TODO: REDO
+        case _                 => None
       }
       case None    => None
     }

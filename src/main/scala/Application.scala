@@ -20,7 +20,7 @@ object Application extends App {
           .getChunkStream
           .tap(b => putStrLn(b._2.toString))
           .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) })
-          .tap(a => putStrLn(a.toString))
+          .tap(a => putStrLn(a.fold(_.msg, _.toString)))
         , OutgoingStream.send)
     } yield ()).runDrain
 

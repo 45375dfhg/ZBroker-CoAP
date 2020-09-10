@@ -91,7 +91,7 @@ object CoapOptionNumber {
   val numbers = format.keySet
 
   def apply(value: Int): Either[CoapMessageException, CoapOptionNumber] =
-    Either.cond(numbers contains value, new CoapOptionNumber(value), InvalidCoapOptionNumber)
+    Either.cond(numbers contains value, new CoapOptionNumber(value), InvalidCoapOptionNumber(s"Failed with $value."))
 }
 
 /**
