@@ -5,13 +5,12 @@ package domain.model.coap
  */
 
 final case class CoapOption(
-  delta    : CoapOptionDelta,  // internal?
+  delta    : CoapOptionDelta,
   exDelta  : Option[CoapOptionExtendedDelta],
-  length   : CoapOptionLength, // internal!
+  length   : CoapOptionLength,
   exLength : Option[CoapOptionExtendedLength],
   value    : CoapOptionValue,
-  // number   : CoapOptionNumber, // questionable TODO: remove
-  offset   : CoapOptionOffset  // same
+  offset   : CoapOptionOffset
 )
 
 final case class CoapOptionOffset (value: Int) extends AnyVal {
@@ -21,8 +20,8 @@ final case class CoapOptionOffset (value: Int) extends AnyVal {
 final case class CoapOptionDelta private(value: Int) extends AnyVal
 object CoapOptionDelta {
   def apply(value: Int): Either[CoapMessageException, CoapOptionDelta] =
-  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-  // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 15 contains value, new CoapOptionDelta(value), InvalidOptionDelta(s"$value is not valid."))
 }
 
@@ -38,8 +37,8 @@ object CoapOptionExtendedDelta {
 final case class CoapOptionLength private(value: Int) extends AnyVal
 object CoapOptionLength {
   def apply(value: Int): Either[CoapMessageException, CoapOptionLength] =
-  // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-  // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 15 contains value, new CoapOptionLength(value), InvalidOptionLength(s"$value is not valid."))
 }
 

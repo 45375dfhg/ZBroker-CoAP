@@ -30,7 +30,7 @@ object CoapGenerationService {
         generateMessageId(head.msgID))).map(_.toByte)
   }
 
-  // TODO: WARNING: TOKEN AND PAYLOAD MODEL NOT DONE AS OF NOW
+  // TODO: WARNING: TOKEN MODEL NOT DONE AS OF NOW
   /**
    * Sequentially transforms the token, the list of options and the payload into their respective
    * byte representation (inside of Chunks) and concatenates them as return value.
@@ -81,18 +81,34 @@ object CoapGenerationService {
       case CoapCodeSuffix   => param.extract
     }
 
+  /**
+   * Option Delta and Option Length can but most must be extended. If the internal representation of an Option contain
+   * an extended value that value might be of size one or two Bytes. This functions returns the respective Chunk[Byte]
+   * presentation of the saved Integer value.
+   *
+   * @param opt An Option of an Extractor member.
+   * @tparam A An Extractor type class member - all members are value classes,
+   *           thus they hold a single extractable integer
+   * @return A Chunk[Byte] of either length 1 or 2.
+   */
   private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
     opt.fold(Chunk[Byte]()) { e =>
       if (e.extract < 269) Chunk(e.extract.toByte)
       else Chunk(((e.extract >> 8) & 0xFF).toByte, (e.extract & 0xFF).toByte)
     }
 
-  // TODO: NOT FULLY IMPLEMENTED
+  /**
+   * Converts the internal representation of a single Option Value into a Chunk[Byte] ready for outward traffic.
+   *
+   * @param v an internal representation of an OptionValue that can either hold an Int, a String, a Chunk[Byte]
+   *          or simply be empty.
+   * @return The Chunk[Byte] equivalent of the given CoapOptionValue
+   */
   private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.content match {
-    case c : IntContent    => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
-    case c : StringContent => Chunk.fromArray(c.value.map(_.toByte).toArray)
-    case c : OpaqueContent => c.value
-    case c : EmptyContent  => c.value
+    case c : IntCoapOptionContent    => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+    case c : StringCoapOptionContent => Chunk.fromArray(c.value.map(_.toByte).toArray)
+    case c : OpaqueCoapOptionContent => c.value
+    case EmptyCoapOptionContent      => Chunk.empty
   }
 
   // TODO: Refactor

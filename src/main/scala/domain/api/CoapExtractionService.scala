@@ -93,14 +93,14 @@ object CoapExtractionService {
 
     // sequentially extract the token, then all the options and lastly gets the payload
     for {
-      t         <- extractToken(chunk)
-      remainder <- chunk.dropExactly(tokenLength)
-      token      = if (t.value.nonEmpty) Some(t) else None
-      optsPay   <- grabOptionsAsList(remainder)
-      options    = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
-      payloadF   = findContentType(options)
-      payload    = getPayload(optsPay._2, payloadF)
-    } yield CoapBody(token, options, payload)
+      token       <- extractToken(chunk)
+      remainder   <- chunk.dropExactly(tokenLength)
+      tokenOption  = if (token.value.nonEmpty) Some(token) else None
+      optsPay     <- grabOptionsAsList(remainder)
+      options      = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
+      mediaType    = getPayloadMediaType(options)
+      payload      = getPayload(optsPay._2, mediaType)
+    } yield CoapBody(tokenOption, options, payload)
   }
 
   private def parseNextOption(
@@ -118,8 +118,9 @@ object CoapExtractionService {
       // extract length value from header, possible extension which depends on the offset of the delta value, pass offset
       lengthTriplet <- getLength(optionHeader, optionBody, deltaOffset)
       (length, extLength, lengthOffset) = lengthTriplet
-      // get the value starting at the position based on the two offsets, ending at that value plus the length value
+      // get the new number as a sum of all previous deltas given by the num parameter and the newest delta
       number        <- CoapOptionNumber(num + delta.value)
+      // get the value starting at the position based on the two offsets, ending at that value plus the length value
       value         <- getValue(optionBody, length, deltaOffset + lengthOffset, number)
       // offset can be understood as the size of the parameter group
       offset         = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
@@ -179,7 +180,7 @@ object CoapExtractionService {
     offset: CoapOptionOffset,
     number: CoapOptionNumber
   ): Either[CoapMessageException, CoapOptionValue] =
-    chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).flatMap(CoapOptionValue(number, _))
+    chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).map(CoapOptionValue(number, _))
 
   private def getFirstByteFrom(bytes: Chunk[Byte]): Either[CoapMessageException, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
@@ -210,27 +211,28 @@ object CoapExtractionService {
    * As long as the number of options per message are low the function complexity does not matter in comparison
    * to the overhead and therefore this is preferable to an HashMap solution
    */
-  private def findContentType(list: Option[List[CoapOption]]): CoapPayloadContentFormat =
+  private def getPayloadMediaType(list: Option[List[CoapOption]]): CoapPayloadMediaTypes =
     list match {
       case Some(l) => l.find(_.value.number.value == 12) match {
         case Some(n) => n.value.number.value match {
-          case 0  => TextFormat
-          case 40 => LinkFormat
-          case 41 => XMLFormat
-          case 42 => OctetStreamFormat
-          case 47 => EXIFormat
-          case 50 => JSONFormat
+          case 0  => TextMediaType
+          case 40 => LinkMediaType
+          case 41 => XMLMediaType
+          case 42 => OctetStreamMediaType
+          case 47 => EXIMediaType
+          case 50 => JSONMediaType
         }
-        case None => SniffingFormat
+        case None => SniffingMediaType
       }
-      case None => SniffingFormat
+      case None => SniffingMediaType
     }
 
-  private def getPayload(chunk: Option[Chunk[Byte]], payloadFormat: CoapPayloadContentFormat): Option[CoapPayload] = {
+  // TODO: FULLY IMPLEMENT
+  private def getPayload(chunk: Option[Chunk[Byte]], payloadMediaType: CoapPayloadMediaTypes): Option[CoapPayload] = {
     chunk match {
-      case Some(c) => payloadFormat match {
-        case TextFormat => Some(CoapPayload(TextPayload(c)))
-        case _          => None
+      case Some(c) => payloadMediaType match {
+        case TextMediaType => Some(CoapPayload(payloadMediaType, TextPayload(c)))
+        case _             => None
       }
       case None    => None
     }

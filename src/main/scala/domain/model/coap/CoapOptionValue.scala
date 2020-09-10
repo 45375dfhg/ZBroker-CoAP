@@ -10,17 +10,18 @@ import zio.Chunk
 
 import scala.collection.immutable.HashMap
 
-final case class CoapOptionValue private(number: CoapOptionNumber, content: Content)
+final case class CoapOptionValue private(number: CoapOptionNumber, content: CoapOptionContent)
 
 object CoapOptionValue {
-  def apply(number: CoapOptionNumber, raw: Chunk[Byte]): Either[CoapMessageException, CoapOptionValue] = {
+  def apply(number: CoapOptionNumber, raw: Chunk[Byte]): CoapOptionValue = {
     val range = number.getOptionLengthRange
-    (number.getOptionFormat match {
-      case IntFormat    => IntContent(raw, range)
-      case StringFormat => StringContent(raw, range)
-      case OpaqueFormat => OpaqueContent(raw, range)
-      case EmptyFormat  => EmptyContent(raw)
-    }).map(content => CoapOptionValue(number, content))
+
+    CoapOptionValue(number, number.getOptionFormat match {
+      case IntOptionFormat    => IntCoapOptionContent(raw, range)
+      case StringOptionFormat => StringCoapOptionContent(raw, range)
+      case OpaqueOptionFormat => OpaqueCoapOptionContent(raw, range)
+      case EmptyOptionFormat  => EmptyCoapOptionContent
+    })
   }
 }
 
@@ -47,25 +48,25 @@ object CoapOptionNumber {
    * Critical, Unsafe, NoCacheKey and Repeatable in the given order for the
    * given CoapOptionNumber
    */
-  def getProperties(number: CoapOptionNumber) =
+  def getProperties(number: CoapOptionNumber): (Boolean, Boolean, Boolean, Boolean) =
     properties(number.value)
 
   private val format: HashMap[Int, (CoapOptionFormat, Range)] = HashMap(
-    1  -> (OpaqueFormat, 0 to 8),
-    3  -> (StringFormat, 1 to 255),
-    4  -> (OpaqueFormat, 1 to 8),
-    5  -> (EmptyFormat,  0 to 0),
-    7  -> (IntFormat,    0 to 2),
-    8  -> (StringFormat, 0 to 255),
-    11 -> (StringFormat, 0 to 255),
-    12 -> (IntFormat,    0 to 2),
-    14 -> (IntFormat,    0 to 4),
-    15 -> (StringFormat, 0 to 255),
-    17 -> (IntFormat,    0 to 2),
-    20 -> (StringFormat, 0 to 255),
-    35 -> (StringFormat, 1 to 1034),
-    39 -> (StringFormat, 1 to 255),
-    60 -> (IntFormat,    0 to 4)
+    1  -> (OpaqueOptionFormat, 0 to 8),
+    3  -> (StringOptionFormat, 1 to 255),
+    4  -> (OpaqueOptionFormat, 1 to 8),
+    5  -> (EmptyOptionFormat,  0 to 0),
+    7  -> (IntOptionFormat,    0 to 2),
+    8  -> (StringOptionFormat, 0 to 255),
+    11 -> (StringOptionFormat, 0 to 255),
+    12 -> (IntOptionFormat,    0 to 2),
+    14 -> (IntOptionFormat,    0 to 4),
+    15 -> (StringOptionFormat, 0 to 255),
+    17 -> (IntOptionFormat,    0 to 2),
+    20 -> (StringOptionFormat, 0 to 255),
+    35 -> (StringOptionFormat, 1 to 1034),
+    39 -> (StringOptionFormat, 1 to 255),
+    60 -> (IntOptionFormat,    0 to 4)
   )
 
   private val properties = HashMap(
@@ -92,41 +93,48 @@ object CoapOptionNumber {
     Either.cond(numbers contains value, new CoapOptionNumber(value), InvalidCoapOptionNumber)
 }
 
+/**
+ * The value of an Option can be written in one of four formats which are portrayed via this ADT
+ */
 sealed trait CoapOptionFormat
-case object IntFormat    extends CoapOptionFormat
-case object StringFormat extends CoapOptionFormat
-case object OpaqueFormat extends CoapOptionFormat
-case object EmptyFormat  extends CoapOptionFormat
 
-sealed trait Content
+case object IntOptionFormat          extends CoapOptionFormat
+case object StringOptionFormat       extends CoapOptionFormat
+case object OpaqueOptionFormat       extends CoapOptionFormat
+case object EmptyOptionFormat        extends CoapOptionFormat
 
-final case class IntContent private(value: Int) extends Content
-object IntContent {
-  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
-    Either.cond(range contains raw.size, new IntContent(ByteBuffer.wrap(raw.toArray).getInt), InvalidCoapOptionLength)
-  }
+
+/**
+ * The content of an Option can be one of four different types.
+ */
+sealed trait CoapOptionContent
+/**
+ * If the length of an option value in a request is
+ * outside the defined range, that option MUST be
+ * treated like an unrecognized option - this is not an error or exception!
+ */
+case object UnrecognizedCoapOptionFormat extends CoapOptionContent
+case object EmptyCoapOptionContent       extends CoapOptionContent
+
+final case class IntCoapOptionContent private(value: Int) extends CoapOptionContent
+object IntCoapOptionContent {
+  def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
+    if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.toArray).getInt)
+    else UnrecognizedCoapOptionFormat
 }
 
-final case class StringContent private(value: String) extends Content
-object StringContent {
-  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
-    Either.cond(range contains raw.size, new StringContent(raw.map(_.toChar).mkString), InvalidCoapOptionLength)
-  }
+final case class StringCoapOptionContent private(value: String) extends CoapOptionContent
+object StringCoapOptionContent {
+  def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
+    if (range contains raw.size) new StringCoapOptionContent(raw.map(_.toChar).mkString)
+    else UnrecognizedCoapOptionFormat
 }
 
-final case class OpaqueContent private(value: Chunk[Byte]) extends Content
-object OpaqueContent {
-  def apply(raw: Chunk[Byte], range: Range): Either[CoapMessageException, Content] = {
-    Either.cond(range contains raw.size, new OpaqueContent(raw), InvalidCoapOptionLength)
-  }
-}
-
-// TODO: Refactor - this should be a case object instead.
-final case class EmptyContent private(value: Chunk[Byte]) extends Content
-object EmptyContent {
-  def apply(raw: Chunk[Byte]): Either[CoapMessageException, Content] = {
-    Either.cond(raw.isEmpty, new EmptyContent(Chunk[Byte]()), InvalidCoapOptionLength)
-  }
+final case class OpaqueCoapOptionContent private(value: Chunk[Byte]) extends CoapOptionContent
+object OpaqueCoapOptionContent {
+  def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
+    if (range contains raw.size) new OpaqueCoapOptionContent(raw)
+    else UnrecognizedCoapOptionFormat
 }
 
 final case class Critical(value: Boolean)   extends AnyVal

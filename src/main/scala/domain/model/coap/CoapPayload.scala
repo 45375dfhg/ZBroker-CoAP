@@ -2,7 +2,7 @@ package domain.model.coap
 
 import zio.Chunk
 
-final case class CoapPayload(coapPayloadContentFormat: CoapPayloadContentFormat, payload: Payload)
+final case class CoapPayload(coapPayloadContentFormat: CoapPayloadMediaTypes, payload: Payload)
 
 sealed trait Payload
 
