@@ -6,7 +6,7 @@ import zio.Chunk
 object ChunkExtension {
 
   implicit class ChunkExtension[A](chunk: Chunk[A]) {
-    def leftPadTo[A](len: Int, element: A): Chunk[A] =
+    def leftPadTo(len: Int, element: A): Chunk[A] =
       Chunk.fill(len - chunk.size)(element) ++ chunk
 
     def takeExactly(n: Int): Either[CoapMessageException, Chunk[A]] = {

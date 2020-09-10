@@ -120,7 +120,7 @@ case object EmptyCoapOptionContent       extends CoapOptionContent
 final case class IntCoapOptionContent private(value: Int) extends CoapOptionContent
 object IntCoapOptionContent {
   def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
-    if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.leftPad(0.toByte, 4).toArray).getInt)
+    if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.leftPadTo(4, 0.toByte).toArray).getInt)
     else UnrecognizedCoapOptionFormat
 }
 
