@@ -214,13 +214,16 @@ object CoapExtractionService {
   private def getPayloadMediaType(list: Option[List[CoapOption]]): CoapPayloadMediaTypes =
     list match {
       case Some(l) => l.find(_.value.number.value == 12) match {
-        case Some(n) => n.value.number.value match {
-          case 0  => TextMediaType
-          case 40 => LinkMediaType
-          case 41 => XMLMediaType
-          case 42 => OctetStreamMediaType
-          case 47 => EXIMediaType
-          case 50 => JSONMediaType
+        case Some(option) => option.value.content match {
+          case c : IntCoapOptionContent => c.value match {
+                      case 0  => TextMediaType
+                      case 40 => LinkMediaType
+                      case 41 => XMLMediaType
+                      case 42 => OctetStreamMediaType
+                      case 47 => EXIMediaType
+                      case 50 => JSONMediaType
+            }
+          case _ => SniffingMediaType
         }
         case None => SniffingMediaType
       }
