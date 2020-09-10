@@ -22,5 +22,5 @@ object OutgoingStream {
         _       <- putStrLn("SEND")
         i       <- server.send(buffer, address)
       } yield i
-    }, Schedule.spaced(1.second) && Schedule.recurs(1))
+    }, Schedule.spaced(100.second) && Schedule.recurs(100))
 }

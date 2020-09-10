@@ -6,6 +6,7 @@ package domain.model.coap
 
 import java.nio.ByteBuffer
 
+import utility.ChunkExtension.ChunkExtension
 import zio.Chunk
 
 import scala.collection.immutable.HashMap
@@ -119,7 +120,7 @@ case object EmptyCoapOptionContent       extends CoapOptionContent
 final case class IntCoapOptionContent private(value: Int) extends CoapOptionContent
 object IntCoapOptionContent {
   def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
-    if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.toArray).getInt)
+    if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.leftPad(0.toByte, 4).toArray).getInt)
     else UnrecognizedCoapOptionFormat
 }
 
@@ -132,6 +133,7 @@ object StringCoapOptionContent {
 
 final case class OpaqueCoapOptionContent private(value: Chunk[Byte]) extends CoapOptionContent
 object OpaqueCoapOptionContent {
+
   def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
     if (range contains raw.size) new OpaqueCoapOptionContent(raw)
     else UnrecognizedCoapOptionFormat
@@ -141,3 +143,4 @@ final case class Critical(value: Boolean)   extends AnyVal
 final case class Unsafe(value: Boolean)     extends AnyVal
 final case class NoCacheKey(value: Boolean) extends AnyVal
 final case class Repeatable(value: Boolean) extends AnyVal
+

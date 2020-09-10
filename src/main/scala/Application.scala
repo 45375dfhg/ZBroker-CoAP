@@ -18,9 +18,9 @@ object Application extends App {
       _ <- ZStream.mergeAll(2, 16)(
         ChunkStreamRepository
           .getChunkStream
-          //.tap(b => putStrLn(b._2.toString))
-          .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) }).drop(1000000).take(1)
-          //.tap(a => putStrLn(a.toString)),
+          .tap(b => putStrLn(b._2.toString))
+          .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) })
+          .tap(a => putStrLn(a.toString))
         , OutgoingStream.send)
     } yield ()).runDrain
 
