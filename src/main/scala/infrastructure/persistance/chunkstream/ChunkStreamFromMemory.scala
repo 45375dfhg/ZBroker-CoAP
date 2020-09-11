@@ -1,4 +1,4 @@
-package infrastructure.chunkstream
+package infrastructure.persistance.chunkstream
 
 import domain.model.chunkstream.ChunkStreamRepository
 import domain.model.chunkstream.ChunkStreamRepository.ChunkStreamRepository
@@ -15,5 +15,4 @@ object ChunkStreamFromMemory extends ChunkStreamRepository.Service {
 //      (i, c)
 //    }
 
-  val live: ZLayer[Any, Nothing, ChunkStreamRepository] = ZLayer.succeed(this)
 }

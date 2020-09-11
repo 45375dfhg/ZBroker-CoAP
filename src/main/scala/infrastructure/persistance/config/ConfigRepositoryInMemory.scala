@@ -1,4 +1,4 @@
-package infrastructure.config
+package infrastructure.persistance.config
 
 import domain.model.config._
 
@@ -11,5 +11,4 @@ object ConfigRepositoryInMemory extends ConfigRepository.Service {
 
   override def getBufferSize: IO[BufferSizeException, BufferSize] = ZIO.fromEither(BufferSize(100))
 
-  val live: Layer[Nothing, Has[ConfigRepository.Service]] = ZLayer.succeed(this)
 }

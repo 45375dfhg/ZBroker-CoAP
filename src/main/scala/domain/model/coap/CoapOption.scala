@@ -19,7 +19,7 @@ final case class CoapOptionOffset (value: Int) extends AnyVal {
 
 final case class CoapOptionDelta private(value: Int) extends AnyVal
 object CoapOptionDelta {
-  def apply(value: Int): Either[CoapMessageException, CoapOptionDelta] =
+  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionDelta] =
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 15 contains value, new CoapOptionDelta(value), InvalidOptionDelta(s"$value is not valid."))
@@ -27,7 +27,7 @@ object CoapOptionDelta {
 
 final case class CoapOptionExtendedDelta private(value: Int)
 object CoapOptionExtendedDelta {
-  def apply(value: Int): Either[CoapMessageException, CoapOptionExtendedDelta] = {
+  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedDelta] = {
     // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
     // The extension value must be greater than 12 which is a highest non special construct value.
     Either.cond(13 to 65804 contains value, new CoapOptionExtendedDelta(value), InvalidOptionDelta(s"$value is not valid."))
@@ -36,7 +36,7 @@ object CoapOptionExtendedDelta {
 
 final case class CoapOptionLength private(value: Int) extends AnyVal
 object CoapOptionLength {
-  def apply(value: Int): Either[CoapMessageException, CoapOptionLength] =
+  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionLength] =
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
     Either.cond(0 to 15 contains value, new CoapOptionLength(value), InvalidOptionLength(s"$value is not valid."))
@@ -44,7 +44,7 @@ object CoapOptionLength {
 
 final case class CoapOptionExtendedLength private(value: Int)
 object CoapOptionExtendedLength {
-  def apply(value: Int): Either[CoapMessageException, CoapOptionExtendedLength] =
+  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedLength] =
   // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
   // The extension value must be greater than 12 which is a highest non special construct value.
     Either.cond(13 to 65804 contains value, new CoapOptionExtendedLength(value), InvalidOptionLength(s"$value is not valid."))

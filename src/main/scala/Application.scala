@@ -2,9 +2,8 @@
 import domain.api.CoapExtractionService
 import domain.model.chunkstream.ChunkStreamRepository
 
-import infrastructure.config.ConfigRepositoryInMemory
-import infrastructure.endpoint.EndpointRepositoryFromSocket
-import infrastructure.chunkstream.{ChunkStreamFromSocket, OutgoingStream}
+import infrastructure.environment.{ChunkStreamRepositoryEnvironment, ConfigRepositoryEnvironment, EndpointEnvironment}
+import infrastructure.persistance.chunkstream.OutgoingStream // TODO: remove after testing
 
 import zio.App
 import zio.console._
@@ -20,14 +19,14 @@ object Application extends App {
           .getChunkStream
           .tap(b => putStrLn(b._2.toString))
           .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) })
-          .tap(a => putStrLn(a.fold(_.msg, _.toString)))
+          .tap(a => putStrLn(a.fold(_.fullMsg, _.toString)))
         , OutgoingStream.send)
     } yield ()).runDrain
 
   val partialLayer = (
-    ConfigRepositoryInMemory.live
-    >+> EndpointRepositoryFromSocket.live
-    >+> ChunkStreamFromSocket.live)
+    ConfigRepositoryEnvironment.fromMemory
+    >+> EndpointEnvironment.fromChannel
+    >+> ChunkStreamRepositoryEnvironment.fromSocket)
 
   def run(args: List[String]) =
     program.tap(l => putStrLn(l.toString)).provideCustomLayer(partialLayer).orDie.exitCode

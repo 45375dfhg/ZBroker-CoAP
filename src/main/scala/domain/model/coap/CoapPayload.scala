@@ -2,7 +2,7 @@ package domain.model.coap
 
 import zio.Chunk
 
-final case class CoapPayload(coapPayloadContentFormat: CoapPayloadMediaTypes, payloadContent: CoapPayloadContent)
+final case class CoapPayload(coapPayloadContentFormat: CoapPayloadMediaType, payloadContent: CoapPayloadContent)
 
 sealed trait CoapPayloadContent
 
@@ -14,15 +14,15 @@ object TextCoapPayloadContent {
 /**
  * The Media Format of an
  */
-sealed trait CoapPayloadMediaTypes
-case object TextMediaType        extends CoapPayloadMediaTypes
-case object LinkMediaType        extends CoapPayloadMediaTypes
-case object XMLMediaType         extends CoapPayloadMediaTypes
-case object OctetStreamMediaType extends CoapPayloadMediaTypes
-case object EXIMediaType         extends CoapPayloadMediaTypes
-case object JSONMediaType        extends CoapPayloadMediaTypes
+sealed trait CoapPayloadMediaType
+case object TextMediaType        extends CoapPayloadMediaType
+case object LinkMediaType        extends CoapPayloadMediaType
+case object XMLMediaType         extends CoapPayloadMediaType
+case object OctetStreamMediaType extends CoapPayloadMediaType
+case object EXIMediaType         extends CoapPayloadMediaType
+case object JSONMediaType        extends CoapPayloadMediaType
 
 // DEFAULT FALLBACK
-case object SniffingMediaType    extends CoapPayloadMediaTypes
+case object SniffingMediaType    extends CoapPayloadMediaType
 
 // TODO: Implement the other Media Types
