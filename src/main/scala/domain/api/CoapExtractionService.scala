@@ -35,12 +35,12 @@ object CoapExtractionService {
   private def headerFromChunk(chunk: Chunk[Byte]): Either[InvalidCoapMessage, CoapHeader] = {
     val (b1, b2, b3, b4) = (chunk(0), chunk(1), chunk(2), chunk(3))
     for {
-      version <- getVersion(b1)
-      msgType <- getMsgType(b1)
-      tLength <- getTLength(b1)
-      prefix  <- getCPrefix(b2)
-      suffix  <- getCSuffix(b2)
-      msgId   <- getMsgId(b3, b4)
+      version <- getVersionFrom(b1)
+      msgType <- getMsgTypeFrom(b1)
+      tLength <- getTLengthFrom(b1)
+      prefix  <- getCPrefixFrom(b2)
+      suffix  <- getCSuffixFrom(b2)
+      msgId   <- getMsgIdFrom(b3, b4)
     } yield CoapHeader(version, msgType, tLength ,prefix, suffix, msgId)
   }
 
@@ -66,21 +66,21 @@ object CoapExtractionService {
      * @return Either an exception or a list of all options and possibly a payload in an option monad
      */
     @tailrec
-    def grabOptionsAsList(
+    def getOptionsAsListFrom(
         rem: Chunk[Byte],
         acc: List[CoapOption] = List.empty,
         num: Int = 0
-      ): Either[InvalidCoapMessage, (List[CoapOption], Option[Chunk[Byte]])] = {
+      ): Either[InvalidCoapMessage, (List[CoapOption], Chunk[Byte])] = {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(r) => grabOptionsAsList(rem.drop(r.offset.value), r :: acc, r.value.number.value)
+            case Right(r) => getOptionsAsListFrom(rem.drop(r.offset.value), r :: acc, r.value.number.value)
             case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
-          case Some(_) => if (rem.tail.nonEmpty) Right(acc.reverse, Some(rem.drop(1)))
+          case Some(_) => if (rem.tail.nonEmpty) Right(acc.reverse, rem.drop(1))
                           else Left(InvalidPayloadMarker("Promised payload is missing. Protocol error."))
-          case None    => Right(acc.reverse, None)
+          case None    => Right(acc.reverse, Chunk.empty)
         }
     }
 
@@ -88,19 +88,19 @@ object CoapExtractionService {
     val tokenLength = header.tLength.value
 
     // makes use of the tokenLength defined above
-    def extractToken(chunk: Chunk[Byte]): Either[InvalidCoapMessage, CoapToken] =
+    def extractTokenFrom(chunk: Chunk[Byte]): Either[InvalidCoapMessage, CoapToken] =
       chunk.takeExactly(tokenLength).map(CoapToken)
 
     // sequentially extract the token, then all the options and lastly gets the payload
     for {
-      token       <- extractToken(chunk)
-      remainder   <- chunk.dropExactly(tokenLength)
-      tokenOption  = if (token.value.nonEmpty) Some(token) else None
-      optsPay     <- grabOptionsAsList(remainder)
-      options      = if (optsPay._1.nonEmpty) Some(optsPay._1) else None
-      mediaType    = getPayloadMediaType(options)
-      payload      = getPayload(optsPay._2, mediaType)
-    } yield CoapBody(tokenOption, options, payload)
+      token              <- extractTokenFrom(chunk)
+      remainder          <- chunk.dropExactly(tokenLength)
+      optsPay            <- getOptionsAsListFrom(remainder)
+      (options, payload) = optsPay
+      tokenO             = if (token.value.nonEmpty) Some(token) else None
+      optionsO           = if (options.nonEmpty) Some(options) else None
+      payloadO           = if (payload.nonEmpty) getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)) else None
+    } yield CoapBody(tokenO, optionsO, payloadO)
   }
 
   private def parseNextOption(
@@ -188,59 +188,45 @@ object CoapExtractionService {
   private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[InvalidCoapMessage, Int] =
     bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
 
-  private def getVersion(b: Byte): Either[InvalidCoapMessage, CoapVersion] =
+  private def getVersionFrom(b: Byte): Either[InvalidCoapMessage, CoapVersion] =
     CoapVersion((b & 0xF0) >>> 6)
 
-  private def getMsgType(b: Byte): Either[InvalidCoapMessage, CoapType] =
+  private def getMsgTypeFrom(b: Byte): Either[InvalidCoapMessage, CoapType] =
     CoapType((b & 0x30) >> 4)
 
-  private def getTLength(b: Byte): Either[InvalidCoapMessage, CoapTokenLength] =
+  private def getTLengthFrom(b: Byte): Either[InvalidCoapMessage, CoapTokenLength] =
     CoapTokenLength(b & 0x0F)
 
-  private def getCPrefix(b: Byte): Either[InvalidCoapMessage, CoapCodePrefix] =
+  private def getCPrefixFrom(b: Byte): Either[InvalidCoapMessage, CoapCodePrefix] =
     CoapCodePrefix((b & 0xE0) >>> 5)
 
-  private def getCSuffix(b: Byte): Either[InvalidCoapMessage, CoapCodeSuffix] =
+  private def getCSuffixFrom(b: Byte): Either[InvalidCoapMessage, CoapCodeSuffix] =
     CoapCodeSuffix(b & 0x1F)
 
-  private def getMsgId(third: Byte, fourth: Byte): Either[InvalidCoapMessage, CoapId] =
+  private def getMsgIdFrom(third: Byte, fourth: Byte): Either[InvalidCoapMessage, CoapId] =
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
 
   /**
    * As long as the number of options per message are low the function complexity does not matter in comparison
    * to the overhead and therefore this is preferable to an HashMap solution
    */
-  private def getPayloadMediaType(list: Option[List[CoapOption]]): CoapPayloadMediaType =
-    list match {
-      case Some(l) => l.find(_.value.number.value == 12) match {
+  private def getPayloadMediaTypeFrom(list: List[CoapOption]): CoapPayloadMediaType =
+    list.find(_.value.number.value == 12) match {
         case Some(option) => option.value.content match {
-          case c : IntCoapOptionContent => c.value match {
-                      case 0  => TextMediaType
-                      case 40 => LinkMediaType
-                      case 41 => XMLMediaType
-                      case 42 => OctetStreamMediaType
-                      case 47 => EXIMediaType
-                      case 50 => JSONMediaType
-                      case _  => SniffingMediaType
-            }
-          case _ => SniffingMediaType
+          case c : IntCoapOptionContent => CoapPayloadMediaType.fromInt(c.value)
+          case _                        => SniffingMediaType
         }
         case None => SniffingMediaType
       }
-      case None => SniffingMediaType
-    }
+
 
   // TODO: FULLY IMPLEMENT
-  private def getPayload(chunk: Option[Chunk[Byte]], payloadMediaType: CoapPayloadMediaType): Option[CoapPayload] = {
-    chunk match {
-      case Some(c) => payloadMediaType match {
-        case TextMediaType     => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c)))
-        case SniffingMediaType => Some(CoapPayload(payloadMediaType, TextCoapPayloadContent(c))) // TODO: REDO
+  private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): Option[CoapPayload] =
+    payloadMediaType match {
+        case TextMediaType     => Some(CoapPayload(TextCoapPayloadContent(chunk)))
+        case SniffingMediaType => Some(CoapPayload(TextCoapPayloadContent(chunk)))
         case _                 => None
       }
-      case None    => None
-    }
-  }
 
   /**
    * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via

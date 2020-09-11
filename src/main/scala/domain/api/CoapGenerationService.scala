@@ -68,7 +68,7 @@ object CoapGenerationService {
       case Some(opts) => generateAllOptions(opts)
       case None => Chunk.empty
     }) ++ (body.payload match {
-      case Some(pay) => generatePayload(pay.payloadContent)
+      case Some(pay) => generatePayload(pay.content)
       case None => Chunk.empty
     })
   }

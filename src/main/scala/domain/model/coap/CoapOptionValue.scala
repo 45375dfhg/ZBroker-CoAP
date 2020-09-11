@@ -104,7 +104,6 @@ case object StringOptionFormat       extends CoapOptionFormat
 case object OpaqueOptionFormat       extends CoapOptionFormat
 case object EmptyOptionFormat        extends CoapOptionFormat
 
-
 /**
  * The content of an Option can be one of four different types.
  */
