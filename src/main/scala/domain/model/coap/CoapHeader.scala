@@ -3,7 +3,7 @@ package domain.model.coap
 import io.estatico.newtype.macros.newtype
 import io.estatico.newtype.ops._
 
-import parameters._
+import header._
 
 final case class CoapHeader(
   version : CoapVersion,
@@ -14,7 +14,7 @@ final case class CoapHeader(
   msgID   : CoapId
 )
 
-package object parameters {
+package object header {
 
   @newtype class CoapVersion private(val value: Int)
 

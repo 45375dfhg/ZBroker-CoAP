@@ -10,8 +10,10 @@ sealed trait CoapPayloadContent
 
 // TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
 final case class TextCoapPayloadContent private(value: String) extends CoapPayloadContent
-object TextCoapPayloadContent {
-  def apply(chunk: Chunk[Byte]): TextCoapPayloadContent = new TextCoapPayloadContent(chunk.map(_.toChar).mkString)
+
+object TextCoapPayloadContent { // Either[InvalidPayloadStructure,
+  def apply(chunk: Chunk[Byte]): TextCoapPayloadContent =
+    new TextCoapPayloadContent(chunk.map(_.toChar).mkString)
 }
 final case class UnknownPayloadContent (value: Chunk[Byte]) extends CoapPayloadContent
 

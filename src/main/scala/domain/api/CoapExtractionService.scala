@@ -1,8 +1,8 @@
 package domain.api
 
 import domain.model.coap._
-import domain.model.coap.parameters._
-import domain.model.coap.optionParameters._
+import domain.model.coap.header._
+import domain.model.coap.option._
 
 import Numeric.Implicits._
 
@@ -105,7 +105,7 @@ object CoapExtractionService {
       tokenO             = Option.when(token.value.nonEmpty)(token)
       optionsO           = Option.when(options.nonEmpty)(options)
       // TODO: THIS IS AN EITHER - PAYLOAD CONVERSION CAN FAIL (e.g. in case of JSON)!
-      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
+      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options))) // TODO: HERE
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 

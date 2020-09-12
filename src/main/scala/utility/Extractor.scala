@@ -1,7 +1,7 @@
 package utility
 
-import domain.model.coap.parameters._
-import domain.model.coap.optionParameters._
+import domain.model.coap.header._
+import domain.model.coap.option._
 
 trait Extractor[A] {
   def extract(param: A): Int

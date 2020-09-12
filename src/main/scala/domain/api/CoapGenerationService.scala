@@ -3,8 +3,8 @@ package domain.api
 import java.nio.ByteBuffer
 
 import domain.model.coap._
-import domain.model.coap.parameters._
-import domain.model.coap.optionParameters._
+import domain.model.coap.header._
+import domain.model.coap.option._
 
 import utility.Extractor
 import utility.Extractor._

@@ -42,3 +42,6 @@ final case class InvalidCoapChunkSize(err: String)            extends InvalidCoa
 final case class InvalidCoapOptionLength(err: String)         extends InvalidCoapMessage {
   override def msg: String = err
 }
+final case class InvalidPayloadStructure(err: String)            extends InvalidCoapMessage {
+  override def msg: String = err
+}
