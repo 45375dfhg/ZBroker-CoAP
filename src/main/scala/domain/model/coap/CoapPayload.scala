@@ -13,6 +13,8 @@ final case class TextCoapPayloadContent private(value: String) extends CoapPaylo
 object TextCoapPayloadContent {
   def apply(chunk: Chunk[Byte]): TextCoapPayloadContent = new TextCoapPayloadContent(chunk.map(_.toChar).mkString)
 }
+final case class UnknownPayloadContent (value: Chunk[Byte]) extends CoapPayloadContent
+
 // TODO: Implement the other Media Types
 
 sealed trait CoapPayloadMediaType

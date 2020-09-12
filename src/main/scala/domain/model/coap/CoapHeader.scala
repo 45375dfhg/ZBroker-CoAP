@@ -1,5 +1,9 @@
 package domain.model.coap
 
+import io.estatico.newtype.macros.newtype
+import io.estatico.newtype.ops._
+
+import parameters._
 /*
  * The entry point is in {{{CoapMessage}}}
  */
@@ -13,12 +17,22 @@ final case class CoapHeader(
   msgID   : CoapId
 )
 
-final case class CoapVersion private(number: Int) extends AnyVal
-object CoapVersion {
-  def apply(number: Int): Either[InvalidCoapMessage, CoapVersion] =
-  // #rfc7252 knows only one valid protocol version
-    Either.cond(1 to 1 contains number, new CoapVersion(1), InvalidCoapVersionException(s"$number is not valid."))
+package object parameters {
+  @newtype class CoapVersion private(val number: Int)
+
+  object CoapVersion {
+    def apply(number: Int): Either[InvalidCoapMessage, CoapVersion] =
+      // #rfc7252 knows only one valid protocol version
+      Either.cond(1 to 1 contains number, number.coerce, InvalidCoapVersionException(s"$number is not valid."))
+  }
 }
+
+//final case class CoapVersion private(number: Int) extends AnyVal
+//object CoapVersion {
+//  def apply(number: Int): Either[InvalidCoapMessage, CoapVersion] =
+//  // #rfc7252 knows only one valid protocol version
+//    Either.cond(1 to 1 contains number, new CoapVersion(1), InvalidCoapVersionException(s"$number is not valid."))
+//}
 
 final case class CoapType private(number: Int) extends AnyVal
 object CoapType {

@@ -1,6 +1,7 @@
 package domain.api
 
 import domain.model.coap._
+import domain.model.coap.parameters._
 import utility.ChunkExtension._
 import zio.{Chunk, UIO, ZIO}
 
@@ -97,9 +98,10 @@ object CoapExtractionService {
       remainder          <- chunk.dropExactly(tokenLength)
       optsPay            <- getOptionsAsListFrom(remainder)
       (options, payload) = optsPay
-      tokenO             = if (token.value.nonEmpty) Some(token) else None
-      optionsO           = if (options.nonEmpty) Some(options) else None
-      payloadO           = if (payload.nonEmpty) getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)) else None
+      tokenO             = Option.when(token.value.nonEmpty)(token)
+      optionsO           = Option.when(options.nonEmpty)(options)
+      // TODO: THIS IS AN EITHER - PAYLOAD CONVERSION CAN FAIL (e.g. in case of JSON)!
+      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 
@@ -221,11 +223,11 @@ object CoapExtractionService {
 
 
   // TODO: FULLY IMPLEMENT
-  private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): Option[CoapPayload] =
+  private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): CoapPayload =
     payloadMediaType match {
-        case TextMediaType     => Some(CoapPayload(TextCoapPayloadContent(chunk)))
-        case SniffingMediaType => Some(CoapPayload(TextCoapPayloadContent(chunk)))
-        case _                 => None
+        case TextMediaType     => CoapPayload(TextCoapPayloadContent(chunk))
+        case SniffingMediaType => CoapPayload(TextCoapPayloadContent(chunk)) // THESE TWO
+        case _                 => CoapPayload(UnknownPayloadContent(chunk))  // KINDA THE SAME
       }
 
   /**

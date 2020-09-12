@@ -11,6 +11,7 @@ libraryDependencies ++= Seq(
     "dev.zio" %% "zio-streams" % "1.0.1",
     "dev.zio" %% "zio-nio" % "1.0.0-RC9",
     "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
+    "io.estatico" %% "newtype" % "0.4.4"
 )
 
 scalacOptions ++= Seq(
@@ -23,5 +24,6 @@ scalacOptions ++= Seq(
     "-Ywarn-dead-code",
     "-Ywarn-numeric-widen",
     "-Ywarn-value-discard",
-    "-Ywarn-unused"
+    "-Ywarn-unused",
+    "-Ymacro-annotations" // required for NewType in 2.12.1+
 )

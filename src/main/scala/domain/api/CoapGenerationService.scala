@@ -3,8 +3,11 @@ package domain.api
 import java.nio.ByteBuffer
 
 import domain.model.coap._
+import domain.model.coap.parameters._
+
 import utility.Extractor
 import utility.Extractor._
+
 import zio.Chunk
 
 /**
