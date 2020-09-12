@@ -2,6 +2,10 @@ package domain.api
 
 import domain.model.coap._
 import domain.model.coap.parameters._
+import domain.model.coap.optionParameters._
+
+import Numeric.Implicits._
+
 import utility.ChunkExtension._
 import zio.{Chunk, UIO, ZIO}
 
@@ -122,7 +126,7 @@ object CoapExtractionService {
       // get the new number as a sum of all previous deltas given by the num parameter and the newest delta
       number        <- CoapOptionNumber(num + delta.value)
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
-      value         <- getValue(optionBody, length, deltaOffset + lengthOffset, number)
+      value         <- getValue(optionBody, length, (deltaOffset + lengthOffset), number)
       // offset can be understood as the size of the parameter group
       offset         = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
     } yield CoapOption(delta, extDelta, length, extLength, value, offset)

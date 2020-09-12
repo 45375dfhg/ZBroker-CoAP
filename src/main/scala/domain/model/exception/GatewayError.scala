@@ -1,7 +1,12 @@
 package domain.model.exception
 
 trait GatewayError extends Exception {
+
+  def cause(value: Any): String =
+    this.getClass.getSimpleName + "failed because of the following value: " + value.toString
+
   def msg: String
+
   def fullMsg: String =
     this.getClass.getSimpleName + ": " + msg + " in: " + this.getStackTrace.mkString("Array(", ", ", ")")
 }

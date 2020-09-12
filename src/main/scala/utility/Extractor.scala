@@ -1,7 +1,7 @@
 package utility
 
-import domain.model.coap._
 import domain.model.coap.parameters._
+import domain.model.coap.optionParameters._
 
 trait Extractor[A] {
   def extract(param: A): Int
@@ -9,7 +9,7 @@ trait Extractor[A] {
 
 object Extractor {
 
-  def extract[A: Extractor](param: A)(implicit ex: Extractor[A]) =
+  def extract[A: Extractor](param: A)(implicit ex: Extractor[A]): Int =
     ex.extract(param)
 
   implicit class ExtractOps[A: Extractor](param: A) {
@@ -19,19 +19,19 @@ object Extractor {
   def apply[A](implicit ex: Extractor[A]): Extractor[A] = ex
 
   implicit val extractVersion: Extractor[CoapVersion] =
-    (param: CoapVersion) => param.number
+    (param: CoapVersion) => param.value
 
   implicit val extractType: Extractor[CoapType] =
-    (param: CoapType) => param.number
+    (param: CoapType) => param.value
 
   implicit val extractTokenLength: Extractor[CoapTokenLength] =
     (param: CoapTokenLength) => param.value
 
   implicit val extractCodePrefix: Extractor[CoapCodePrefix] =
-    (param: CoapCodePrefix) => param.number
+    (param: CoapCodePrefix) => param.value
 
   implicit val extractCodeSuffix: Extractor[CoapCodeSuffix] =
-    (param: CoapCodeSuffix) => param.number
+    (param: CoapCodeSuffix) => param.value
 
   implicit val extractCodeId: Extractor[CoapId] =
     (param: CoapId) => param.value

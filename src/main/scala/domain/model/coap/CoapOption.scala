@@ -1,8 +1,10 @@
 package domain.model.coap
 
-/*
- * The entry point is in {{{CoapMessage}}}
- */
+import io.estatico.newtype.NewType
+import io.estatico.newtype.macros.newtype
+import io.estatico.newtype.ops._
+
+import optionParameters._
 
 final case class CoapOption(
   delta    : CoapOptionDelta,
@@ -13,39 +15,48 @@ final case class CoapOption(
   offset   : CoapOptionOffset
 )
 
-final case class CoapOptionOffset (value: Int) extends AnyVal {
-  def +(that: CoapOptionOffset): CoapOptionOffset = CoapOptionOffset(value + that.value)
-}
+package object optionParameters {
 
-final case class CoapOptionDelta private(value: Int) extends AnyVal
-object CoapOptionDelta {
-  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionDelta] =
-    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-    // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    Either.cond(0 to 15 contains value, new CoapOptionDelta(value), InvalidOptionDelta(s"$value is not valid."))
-}
+  @newtype class CoapOptionDelta private(val value: Int)
 
-final case class CoapOptionExtendedDelta private(value: Int)
-object CoapOptionExtendedDelta {
-  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedDelta] = {
-    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
-    // The extension value must be greater than 12 which is a highest non special construct value.
-    Either.cond(13 to 65804 contains value, new CoapOptionExtendedDelta(value), InvalidOptionDelta(s"$value is not valid."))
+  object CoapOptionDelta {
+    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionDelta] =
+      // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+      // ... while 13 and 14 lead to special constructs via ext8 and ext16
+      Either.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
   }
-}
 
-final case class CoapOptionLength private(value: Int) extends AnyVal
-object CoapOptionLength {
-  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionLength] =
-    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-    // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    Either.cond(0 to 15 contains value, new CoapOptionLength(value), InvalidOptionLength(s"$value is not valid."))
-}
+  @newtype class CoapOptionExtendedDelta private(val value: Int)
 
-final case class CoapOptionExtendedLength private(value: Int)
-object CoapOptionExtendedLength {
-  def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedLength] =
-  // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
-  // The extension value must be greater than 12 which is a highest non special construct value.
-    Either.cond(13 to 65804 contains value, new CoapOptionExtendedLength(value), InvalidOptionLength(s"$value is not valid."))
+  object CoapOptionExtendedDelta {
+    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedDelta] = {
+      // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
+      // The extension value must be greater than 12 which is a highest non special construct value.
+      Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+    }
+  }
+
+  @newtype class CoapOptionLength private(val value: Int)
+
+  object CoapOptionLength {
+    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionLength] =
+      // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+      // ... while 13 and 14 lead to special constructs via ext8 and ext16
+      Either.cond(0 to 15 contains value, value.coerce, InvalidOptionLength(s"$value"))
+  }
+
+  @newtype class CoapOptionExtendedLength private(val value: Int)
+
+  object CoapOptionExtendedLength {
+    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedLength] =
+      // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
+      // The extension value must be greater than 12 which is a highest non special construct value.
+      Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
+  }
+
+  @newtype case class CoapOptionOffset(value: Int)
+
+  object CoapOptionOffset {
+    implicit val numeric: Numeric[CoapOptionOffset] = deriving
+  }
 }
