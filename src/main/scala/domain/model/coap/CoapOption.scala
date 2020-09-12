@@ -16,6 +16,7 @@ final case class CoapOption(
   exDelta  : Option[CoapOptionExtendedDelta],
   length   : CoapOptionLength,
   exLength : Option[CoapOptionExtendedLength],
+  number   : CoapOptionNumber,
   value    : CoapOptionValue,
   offset   : CoapOptionOffset
 )
@@ -64,11 +65,11 @@ package object option {
     implicit val numeric: Numeric[CoapOptionOffset] = deriving
   }
 
-  final case class CoapOptionValue private(number: CoapOptionNumber, content: CoapOptionContent)
+  @newtype class CoapOptionValue private(val content: CoapOptionContent)
 
   object CoapOptionValue {
     def apply(number: CoapOptionNumber, raw: Chunk[Byte]): CoapOptionValue =
-      new CoapOptionValue(number, number.getOptionFormat.transform(raw, number.getOptionLengthRange))
+      number.getOptionFormat.transform(raw, number.getOptionLengthRange).coerce
   }
 
   @newtype class CoapOptionNumber private(val value: Int) {
@@ -135,7 +136,7 @@ package object option {
       60 -> (false, false, true,  true)
     )
 
-    val numbers = format.keySet
+    private val numbers = format.keySet
 
     def apply(value: Int): Either[InvalidCoapMessage, CoapOptionNumber] =
       Either.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))
@@ -156,7 +157,7 @@ package object option {
 
 
   sealed trait CoapOptionContent
-  case object UnrecognizedCoapOptionFormat extends CoapOptionContent
+  case object UnrecognizedContent          extends CoapOptionContent
   case object EmptyCoapOptionContent       extends CoapOptionContent
 
   final case class IntCoapOptionContent private(value: Int) extends CoapOptionContent
@@ -164,7 +165,7 @@ package object option {
   object IntCoapOptionContent {
     def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
       if (range contains raw.size) new IntCoapOptionContent(ByteBuffer.wrap(raw.leftPadTo(4, 0.toByte).toArray).getInt)
-      else UnrecognizedCoapOptionFormat
+      else UnrecognizedContent
   }
 
   final case class StringCoapOptionContent private(value: String) extends CoapOptionContent
@@ -172,7 +173,7 @@ package object option {
   object StringCoapOptionContent {
     def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
       if (range contains raw.size) new StringCoapOptionContent(raw.map(_.toChar).mkString)
-      else UnrecognizedCoapOptionFormat
+      else UnrecognizedContent
   }
 
   final case class OpaqueCoapOptionContent private(value: Chunk[Byte]) extends CoapOptionContent
@@ -180,7 +181,7 @@ package object option {
   object OpaqueCoapOptionContent {
     def apply(raw: Chunk[Byte], range: Range): CoapOptionContent =
       if (range contains raw.size) new OpaqueCoapOptionContent(raw)
-      else UnrecognizedCoapOptionFormat
+      else UnrecognizedContent
   }
 
   @newtype case class Critical(value: Boolean)

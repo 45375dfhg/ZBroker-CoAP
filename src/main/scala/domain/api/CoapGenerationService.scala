@@ -60,8 +60,8 @@ object CoapGenerationService {
     }
 
     // TODO: IMPLEMENT the other payload types
-    def generatePayload(payload: CoapPayloadContent): Chunk[Byte] = payload match {
-      case p : TextCoapPayloadContent => Chunk.fromArray(p.value.map(_.toByte).toArray)
+    def generatePayload(payload: CoapPayload): Chunk[Byte] = payload match {
+      case p : TextCoapPayload => Chunk.fromArray(p.value.map(_.toByte).toArray)
       case _ => Chunk[Byte]()
     }
 
@@ -72,7 +72,7 @@ object CoapGenerationService {
       case Some(opts) => generateAllOptions(opts)
       case None => Chunk.empty
     }) ++ (body.payload match {
-      case Some(pay) => generatePayload(pay.content)
+      case Some(pay) => generatePayload(pay)
       case None => Chunk.empty
     })
   }
@@ -112,10 +112,12 @@ object CoapGenerationService {
    * @return The Chunk[Byte] equivalent of the given CoapOptionValue
    */
   private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.content match {
-    case c : IntCoapOptionContent    => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
-    case c : StringCoapOptionContent => Chunk.fromArray(c.value.map(_.toByte).toArray)
-    case c : OpaqueCoapOptionContent => c.value
-    case EmptyCoapOptionContent      => Chunk.empty
+    case c : IntCoapOptionContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+    case c : StringCoapOptionContent  => Chunk.fromArray(c.value.map(_.toByte).toArray)
+    case c : OpaqueCoapOptionContent  => c.value
+    case EmptyCoapOptionContent       => Chunk.empty
+    case UnrecognizedContent          => Chunk.empty
+    case _                            => Chunk.empty // TODO: REMOVE
   }
 
   // TODO: Refactor

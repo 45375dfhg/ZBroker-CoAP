@@ -4,18 +4,17 @@ import zio.Chunk
 
 import scala.collection.immutable.HashMap
 
-final case class CoapPayload(content: CoapPayloadContent)
 
-sealed trait CoapPayloadContent
+sealed trait CoapPayload
 
 // TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
-final case class TextCoapPayloadContent private(value: String) extends CoapPayloadContent
+final case class TextCoapPayload private(value: String) extends CoapPayload
 
-object TextCoapPayloadContent { // Either[InvalidPayloadStructure,
-  def apply(chunk: Chunk[Byte]): TextCoapPayloadContent =
-    new TextCoapPayloadContent(chunk.map(_.toChar).mkString)
+object TextCoapPayload { // Either[InvalidPayloadStructure,
+  def apply(chunk: Chunk[Byte]): TextCoapPayload =
+    new TextCoapPayload(chunk.map(_.toChar).mkString)
 }
-final case class UnknownPayloadContent (value: Chunk[Byte]) extends CoapPayloadContent
+final case class UnknownPayload (value: Chunk[Byte]) extends CoapPayload
 
 // TODO: Implement the other Media Types
 

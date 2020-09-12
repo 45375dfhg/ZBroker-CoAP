@@ -79,7 +79,7 @@ object CoapExtractionService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
-            case Right(r) => getOptionsAsListFrom(rem.drop(r.offset.value), r :: acc, r.value.number.value)
+            case Right(r) => getOptionsAsListFrom(rem.drop(r.offset.value), r :: acc, r.number.value)
             case Left(er) => Left(er)
           }
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
@@ -129,7 +129,7 @@ object CoapExtractionService {
       value         <- getValue(optionBody, length, (deltaOffset + lengthOffset), number)
       // offset can be understood as the size of the parameter group
       offset         = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
-    } yield CoapOption(delta, extDelta, length, extLength, value, offset)
+    } yield CoapOption(delta, extDelta, length, extLength, number, value, offset)
   }
 
   // TODO: Refactor
@@ -217,7 +217,7 @@ object CoapExtractionService {
    * to the overhead and therefore this is preferable to an HashMap solution
    */
   private def getPayloadMediaTypeFrom(list: List[CoapOption]): CoapPayloadMediaType =
-    list.find(_.value.number.value == 12) match {
+    list.find(_.number.value == 12) match {
         case Some(option) => option.value.content match {
           case c : IntCoapOptionContent => CoapPayloadMediaType.fromInt(c.value)
           case _                        => SniffingMediaType
@@ -229,9 +229,9 @@ object CoapExtractionService {
   // TODO: FULLY IMPLEMENT
   private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): CoapPayload =
     payloadMediaType match {
-        case TextMediaType     => CoapPayload(TextCoapPayloadContent(chunk))
-        case SniffingMediaType => CoapPayload(TextCoapPayloadContent(chunk)) // THESE TWO
-        case _                 => CoapPayload(UnknownPayloadContent(chunk))  // KINDA THE SAME
+        case TextMediaType     => TextCoapPayload(chunk)
+        case SniffingMediaType => TextCoapPayload(chunk) // THESE TWO
+        case _                 => UnknownPayload(chunk)  // KINDA THE SAME
       }
 
   /**
@@ -241,7 +241,7 @@ object CoapExtractionService {
    */
   private def convertOptionListToMap(list: List[CoapOption]): HashMap[CoapOptionNumber, List[CoapOption]] =
     list.foldRight(HashMap[CoapOptionNumber, List[CoapOption]]()) { (c, acc) =>
-      val number = c.value.number
+      val number = c.number
       if (acc.isDefinedAt(number))
         if (CoapOptionNumber.getProperties(number)._4) acc + (number -> (c :: acc(number)))
         else acc
