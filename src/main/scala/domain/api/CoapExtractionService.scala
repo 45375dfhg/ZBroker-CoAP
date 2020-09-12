@@ -218,21 +218,15 @@ object CoapExtractionService {
    */
   private def getPayloadMediaTypeFrom(list: List[CoapOption]): CoapPayloadMediaType =
     list.find(_.number.value == 12) match {
-        case Some(option) => option.value.content match {
-          case c : IntCoapOptionContent => CoapPayloadMediaType.fromInt(c.value)
-          case _                        => SniffingMediaType
+        case Some(option) => option.optValue.content match {
+          case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
+          case _                             => SniffingMediaType
         }
         case None => SniffingMediaType
       }
 
-
-  // TODO: FULLY IMPLEMENT
   private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): CoapPayload =
-    payloadMediaType match {
-        case TextMediaType     => TextCoapPayload(chunk)
-        case SniffingMediaType => TextCoapPayload(chunk) // THESE TWO
-        case _                 => UnknownPayload(chunk)  // KINDA THE SAME
-      }
+    payloadMediaType.transform(chunk)
 
   /**
    * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via

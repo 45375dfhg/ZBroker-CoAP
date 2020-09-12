@@ -54,7 +54,7 @@ object CoapGenerationService {
        */
       def generateOneOption(option: CoapOption): Chunk[Byte] =
         (generateAsByte(option.delta) + generateAsByte(option.length)).toByte +:
-          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.value))
+          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.optValue))
 
       Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
@@ -112,11 +112,11 @@ object CoapGenerationService {
    * @return The Chunk[Byte] equivalent of the given CoapOptionValue
    */
   private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.content match {
-    case c : IntCoapOptionContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
-    case c : StringCoapOptionContent  => Chunk.fromArray(c.value.map(_.toByte).toArray)
-    case c : OpaqueCoapOptionContent  => c.value
-    case EmptyCoapOptionContent       => Chunk.empty
-    case UnrecognizedContent          => Chunk.empty
+    case c : IntCoapOptionValueContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+    case c : StringCoapOptionValueContent  => Chunk.fromArray(c.value.map(_.toByte).toArray)
+    case c : OpaqueCoapOptionValueContent  => c.value
+    case EmptyCoapOptionValueContent       => Chunk.empty
+    case UnrecognizedValueContent          => Chunk.empty
     case _                            => Chunk.empty // TODO: REMOVE
   }
 

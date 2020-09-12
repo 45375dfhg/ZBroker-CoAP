@@ -18,7 +18,13 @@ final case class UnknownPayload (value: Chunk[Byte]) extends CoapPayload
 
 // TODO: Implement the other Media Types
 
-sealed trait CoapPayloadMediaType
+sealed trait CoapPayloadMediaType {
+  def transform(chunk: Chunk[Byte]): CoapPayload = this match {
+    case TextMediaType     => TextCoapPayload(chunk)
+    case SniffingMediaType =>TextCoapPayload(chunk) // placeholder
+    case _                 => UnknownPayload(chunk)
+  }
+}
 
 object CoapPayloadMediaType {
   def fromInt(ref: Int): CoapPayloadMediaType = references.getOrElse(ref, SniffingMediaType)
