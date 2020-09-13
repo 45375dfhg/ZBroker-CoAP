@@ -16,7 +16,7 @@ import zio.Chunk
  * into its respective low level form. The result type is of Chunk[Byte] and thus can be
  * transported to third parties via a ZIO-NIO channel
  */
-object CoapGenerationService {
+object CoapSerializerService {
 
   def generateFromMessage(message: CoapMessage): Chunk[Byte] =
     generateHeader(message.header) ++ generateBody(message.body)

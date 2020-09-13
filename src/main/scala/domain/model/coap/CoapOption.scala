@@ -26,7 +26,7 @@ package object option {
   @newtype class CoapOptionDelta private(val value: Int)
 
   object CoapOptionDelta {
-    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionDelta] =
+    def apply(value: Int): Either[MessageFormatError, CoapOptionDelta] =
       // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
       // ... while 13 and 14 lead to special constructs via ext8 and ext16
       Either.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
@@ -35,7 +35,7 @@ package object option {
   @newtype class CoapOptionExtendedDelta private(val value: Int)
 
   object CoapOptionExtendedDelta {
-    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedDelta] =
+    def apply(value: Int): Either[MessageFormatError, CoapOptionExtendedDelta] =
       // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
       // The extension value must be greater than 12 which is a highest non special construct value.
       Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
@@ -44,7 +44,7 @@ package object option {
   @newtype class CoapOptionLength private(val value: Int)
 
   object CoapOptionLength {
-    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionLength] =
+    def apply(value: Int): Either[MessageFormatError, CoapOptionLength] =
       // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
       // ... while 13 and 14 lead to special constructs via ext8 and ext16
       Either.cond(0 to 15 contains value, value.coerce, InvalidOptionLength(s"$value"))
@@ -53,7 +53,7 @@ package object option {
   @newtype class CoapOptionExtendedLength private(val value: Int)
 
   object CoapOptionExtendedLength {
-    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionExtendedLength] =
+    def apply(value: Int): Either[MessageFormatError, CoapOptionExtendedLength] =
       // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
       // The extension value must be greater than 12 which is a highest non special construct value.
       Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
@@ -138,7 +138,7 @@ package object option {
 
     private val numbers = format.keySet
 
-    def apply(value: Int): Either[InvalidCoapMessage, CoapOptionNumber] =
+    def apply(value: Int): Either[MessageFormatError, CoapOptionNumber] =
       Either.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))
   }
 

@@ -1,5 +1,5 @@
 
-import domain.api.CoapExtractionService
+import domain.api.CoapDeserializerService
 import domain.model.chunkstream.ChunkStreamRepository
 
 import infrastructure.environment.{ChunkStreamRepositoryEnvironment, ConfigRepositoryEnvironment, EndpointEnvironment}
@@ -18,8 +18,8 @@ object Application extends App {
         ChunkStreamRepository
           .getChunkStream
           .tap(b => putStrLn(b._2.toString))
-          .mapM({ case (_, c) => CoapExtractionService.extractFromChunk(c) })
-          .tap(a => putStrLn(a.fold(_.fullMsg, _.toString)))
+          .mapM({ case (_, c) => CoapDeserializerService.extractFromChunk(c) })
+          .tap(a => putStrLn(a.toString))
         , OutgoingStream.send)
     } yield ()).runDrain
 

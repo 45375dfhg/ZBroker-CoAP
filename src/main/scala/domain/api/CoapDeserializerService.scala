@@ -5,9 +5,8 @@ import domain.model.coap.header._
 import domain.model.coap.option._
 
 import Numeric.Implicits._
-
 import utility.ChunkExtension._
-import zio.{Chunk, UIO, ZIO}
+import zio.{Chunk, IO, UIO, URIO, ZIO}
 
 import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
@@ -16,7 +15,7 @@ import scala.collection.immutable.HashMap
  * This service provides the functionality to extract CoAP parameters from Chunk[Byte]
  * and transform them to a model representation of a CoAP message for internal usage.
  */
-object CoapExtractionService {
+object CoapDeserializerService {
 
   /**
    * Takes a chunk and attempts to convert it into a CoapMessage.
@@ -27,17 +26,17 @@ object CoapExtractionService {
    * Error handling is done via short-circuiting since a malformed packet would throw
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
-  def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[InvalidCoapMessage, CoapMessage]] =
+  def extractFromChunk(chunk: Chunk[Byte]): URIO[Any, Either[Either[MessageFormatError, CoapId], CoapMessage]] =
     ZIO.fromEither(for {
       header <- chunk.takeExactly(4).flatMap(headerFromChunk)
       body   <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
-    } yield CoapMessage(header, body)).either
+    } yield CoapMessage(header, body)).orElseFail(getMsgIdFromMessage(chunk)).either
 
   /**
    * Attempts to form a CoapHeader when handed a Chunk of size 4.
    * Might fail with header parameter dependent errors.
    */
-  private def headerFromChunk(chunk: Chunk[Byte]): Either[InvalidCoapMessage, CoapHeader] = {
+  private def headerFromChunk(chunk: Chunk[Byte]): Either[MessageFormatError, CoapHeader] = {
     val (b1, b2, b3, b4) = (chunk(0), chunk(1), chunk(2), chunk(3))
     for {
       version <- getVersionFrom(b1)
@@ -58,7 +57,7 @@ object CoapExtractionService {
    * @param header is required to extract the respective token length.
    * @return Either a CoapBody or an Exception
    */
-  private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): Either[InvalidCoapMessage, CoapBody] = {
+  private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): Either[MessageFormatError, CoapBody] = {
 
     /**
      * Recursively iterates over the chunk. It checks the current head for existence and on existence whether the
@@ -75,7 +74,7 @@ object CoapExtractionService {
         rem: Chunk[Byte],
         acc: List[CoapOption] = List.empty,
         num: Int = 0
-      ): Either[InvalidCoapMessage, (List[CoapOption], Chunk[Byte])] = {
+      ): Either[MessageFormatError, (List[CoapOption], Chunk[Byte])] = {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte => parseNextOption(b, rem, num) match {
@@ -93,7 +92,7 @@ object CoapExtractionService {
     val tokenLength = header.tLength.value
 
     // makes use of the tokenLength defined above
-    def extractTokenFrom(chunk: Chunk[Byte]): Either[InvalidCoapMessage, CoapToken] =
+    def extractTokenFrom(chunk: Chunk[Byte]): Either[MessageFormatError, CoapToken] =
       chunk.takeExactly(tokenLength).map(CoapToken)
 
     // sequentially extract the token, then all the options and lastly gets the payload
@@ -113,7 +112,7 @@ object CoapExtractionService {
     optionHeader: Byte,
     chunk: Chunk[Byte],
     num: Int
-  ): Either[InvalidCoapMessage, CoapOption] = {
+  ): Either[MessageFormatError, CoapOption] = {
     // option header is always one byte - empty check happens during parameter extraction
     val optionBody = chunk.drop(1)
     for {
@@ -136,7 +135,7 @@ object CoapExtractionService {
   private def getDelta(
     headerByte: Byte,
     remainder: Chunk[Byte]
-  ): Either[InvalidCoapMessage, (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)] =
+  ): Either[MessageFormatError, (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)] =
     (headerByte & 0xF0) >>> 4 match {
       case 13 => for {
           i <- getFirstByteFrom(remainder)
@@ -160,7 +159,7 @@ object CoapExtractionService {
     headerByte: Byte,
     remainder: Chunk[Byte],
     deltaOffset: CoapOptionOffset
-  ): Either[InvalidCoapMessage, (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)] =
+  ): Either[MessageFormatError, (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)] =
     headerByte & 0x0F match {
       case 13 => for {
           i <- getFirstByteFrom(remainder.drop(deltaOffset.value).take(1))
@@ -184,33 +183,36 @@ object CoapExtractionService {
     length: CoapOptionLength,
     offset: CoapOptionOffset,
     number: CoapOptionNumber
-  ): Either[InvalidCoapMessage, CoapOptionValue] =
+  ): Either[MessageFormatError, CoapOptionValue] =
     chunk.dropExactly(offset.value).flatMap(_.takeExactly(length.value)).map(CoapOptionValue(number, _))
 
-  private def getFirstByteFrom(bytes: Chunk[Byte]): Either[InvalidCoapMessage, Int] =
+  private def getFirstByteFrom(bytes: Chunk[Byte]): Either[MessageFormatError, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
   // TODO: 0xFF necessary?
-  private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[InvalidCoapMessage, Int] =
+  private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): Either[MessageFormatError, Int] =
     bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
 
-  private def getVersionFrom(b: Byte): Either[InvalidCoapMessage, CoapVersion] =
+  private def getVersionFrom(b: Byte): Either[MessageFormatError, CoapVersion] =
     CoapVersion((b & 0xF0) >>> 6)
 
-  private def getMsgTypeFrom(b: Byte): Either[InvalidCoapMessage, CoapType] =
+  private def getMsgTypeFrom(b: Byte): Either[MessageFormatError, CoapType] =
     CoapType((b & 0x30) >> 4)
 
-  private def getTLengthFrom(b: Byte): Either[InvalidCoapMessage, CoapTokenLength] =
+  private def getTLengthFrom(b: Byte): Either[MessageFormatError, CoapTokenLength] =
     CoapTokenLength(b & 0x0F)
 
-  private def getCPrefixFrom(b: Byte): Either[InvalidCoapMessage, CoapCodePrefix] =
+  private def getCPrefixFrom(b: Byte): Either[MessageFormatError, CoapCodePrefix] =
     CoapCodePrefix((b & 0xE0) >>> 5)
 
-  private def getCSuffixFrom(b: Byte): Either[InvalidCoapMessage, CoapCodeSuffix] =
+  private def getCSuffixFrom(b: Byte): Either[MessageFormatError, CoapCodeSuffix] =
     CoapCodeSuffix(b & 0x1F)
 
-  private def getMsgIdFrom(third: Byte, fourth: Byte): Either[InvalidCoapMessage, CoapId] =
+  private def getMsgIdFrom(third: Byte, fourth: Byte): Either[MessageFormatError, CoapId] =
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
+
+  def getMsgIdFromMessage(raw: Chunk[Byte]): Either[MessageFormatError, CoapId] =
+    raw.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => getMsgIdFrom(c(0), c(1)))
 
   /**
    * As long as the number of options per message are low the function complexity does not matter in comparison

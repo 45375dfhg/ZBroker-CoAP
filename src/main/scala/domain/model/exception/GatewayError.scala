@@ -1,5 +1,6 @@
 package domain.model.exception
 
+// shout out to @Rudder
 trait GatewayError extends Exception {
 
   def cause(value: Any): String =
