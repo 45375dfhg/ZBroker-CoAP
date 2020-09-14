@@ -17,6 +17,7 @@ import scala.collection.immutable.HashMap
  */
 object CoapDeserializerService {
 
+  type IgnoredMessage = (MessageFormatError, Option[CoapId])
   /**
    * Takes a chunk and attempts to convert it into a CoapMessage.
    * <p>
@@ -26,11 +27,12 @@ object CoapDeserializerService {
    * Error handling is done via short-circuiting since a malformed packet would throw
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
-  def extractFromChunk(chunk: Chunk[Byte]): URIO[Any, Either[Either[MessageFormatError, CoapId], CoapMessage]] =
+  def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[IgnoredMessage, CoapMessage]] =
     ZIO.fromEither(for {
-      header <- chunk.takeExactly(4).flatMap(headerFromChunk)
-      body   <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
-    } yield CoapMessage(header, body)).orElseFail(getMsgIdFromMessage(chunk)).either
+      header  <- chunk.takeExactly(4).flatMap(headerFromChunk)
+      body    <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
+      message <- validateMessage(header, body)
+    } yield message).mapError(err => (err, getMsgIdFromMessage(chunk))).either
 
   /**
    * Attempts to form a CoapHeader when handed a Chunk of size 4.
@@ -211,8 +213,8 @@ object CoapDeserializerService {
   private def getMsgIdFrom(third: Byte, fourth: Byte): Either[MessageFormatError, CoapId] =
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
 
-  def getMsgIdFromMessage(raw: Chunk[Byte]): Either[MessageFormatError, CoapId] =
-    raw.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => getMsgIdFrom(c(0), c(1)))
+  def getMsgIdFromMessage(raw: Chunk[Byte]): Option[CoapId] =
+    raw.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => getMsgIdFrom(c(0), c(1))).toOption
 
   /**
    * As long as the number of options per message are low the function complexity does not matter in comparison
@@ -229,6 +231,10 @@ object CoapDeserializerService {
 
   private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): CoapPayload =
     payloadMediaType.transform(chunk)
+
+  // TODO: Implement empty message check in general and for reset messages
+  private def validateMessage(header: CoapHeader, body: CoapBody): Either[MessageFormatError, CoapMessage] =
+    Right(CoapMessage(header, body))
 
   /**
    * Converts a List[CoapOption] to a HashMap so that each Option is directly addressable via

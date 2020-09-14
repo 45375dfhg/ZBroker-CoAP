@@ -18,7 +18,13 @@ object Application extends App {
         ChunkStreamRepository
           .getChunkStream
           .tap(b => putStrLn(b._2.toString))
-          .mapM({ case (_, c) => CoapDeserializerService.extractFromChunk(c) })
+          .mapM({ case (_, c) => CoapDeserializerService.extractFromChunk(c) }).collect {
+            case Right(v) => Right(v)
+            case l @ Left((err, opt)) => opt match {
+              case Some(id) => Left(err, id)
+            }
+          }
+          // refactor the inline collect into its own function
           .tap(a => putStrLn(a.toString))
         , OutgoingStream.send)
     } yield ()).runDrain

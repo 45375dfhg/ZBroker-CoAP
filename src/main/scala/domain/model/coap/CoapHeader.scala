@@ -22,6 +22,8 @@ package object header {
     def apply(value: Int): Either[MessageFormatError, CoapVersion] =
       // #rfc7252 knows only one valid protocol version
       Either.cond(1 to 1 contains value, value.coerce, InvalidCoapVersion(s"$value"))
+
+    val default: CoapVersion = 1.coerce
   }
 
   @newtype class CoapType private(val value: Int)
@@ -30,6 +32,9 @@ package object header {
     def apply(value: Int): Either[MessageFormatError, CoapType] =
       // #rfc7252 accepts 4 different types in a 2-bit window
       Either.cond(0 to 3 contains value, value.coerce, InvalidCoapType(s"$value"))
+
+    val empty: CoapType       = 3.coerce
+    val acknowledge: CoapType = 2.coerce
   }
 
   @newtype class CoapTokenLength private(val value: Int)
@@ -38,6 +43,8 @@ package object header {
     def apply(value: Int): Either[MessageFormatError, CoapTokenLength] =
       // #rfc7252 accepts a length of 0 to 8 in a 4-bit window, 9 to 15 are reserved
       Either.cond(0 to 8 contains value, value.coerce, InvalidCoapTokenLength(s"$value"))
+
+    val empty: CoapTokenLength = 0.coerce
   }
 
   @newtype class CoapCodePrefix private(val value: Int)
@@ -46,6 +53,8 @@ package object header {
     def apply(value: Int): Either[MessageFormatError, CoapCodePrefix] =
       // #rfc7252 accepts prefix codes between 0 to 7 in a 3-bit window
       Either.cond(0 to 7 contains value, value.coerce, InvalidCoapCode(s"$value"))
+
+    val empty: CoapCodePrefix = 0.coerce
   }
 
   @newtype class CoapCodeSuffix private(val value: Int)
@@ -54,6 +63,8 @@ package object header {
     def apply(value: Int): Either[MessageFormatError, CoapCodeSuffix] =
       // #rfc7252 accepts suffix codes between 0 to 31 in a 5-bit window
       Either.cond(0 to 31 contains value, value.coerce, InvalidCoapCode(s"$value"))
+
+    val empty: CoapCodeSuffix = 0.coerce
   }
 
   @newtype class CoapId private(val value: Int)

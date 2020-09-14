@@ -2,9 +2,7 @@ package domain.model.coap
 
 import domain.model.exception.GatewayError
 
-sealed trait MessageFormatError                       extends GatewayError {
-  def err: String
-}
+sealed trait MessageFormatError                       extends GatewayError
 
 final case class InvalidCoapVersion(err: String)      extends MessageFormatError {
   override def msg: String = err
@@ -44,4 +42,7 @@ final case class InvalidCoapOptionLength(err: String) extends MessageFormatError
 }
 final case class InvalidPayloadStructure(err: String) extends MessageFormatError {
   override def msg: String = err
+}
+case object InvalidEmptyMessage extends MessageFormatError {
+  override def msg = "Empty message was promised, yet contains content in body."
 }
