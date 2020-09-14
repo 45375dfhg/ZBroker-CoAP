@@ -2,10 +2,15 @@ package domain.model.coap
 
 import java.nio.ByteBuffer
 
+import option._
+import zio.IO
+
 import io.estatico.newtype.macros.newtype
 import io.estatico.newtype.ops._
+
 import zio.Chunk
-import option._
+
+
 import utility.ChunkExtension.ChunkExtension
 
 import scala.collection.immutable.HashMap
@@ -26,37 +31,37 @@ package object option {
   @newtype class CoapOptionDelta private(val value: Int)
 
   object CoapOptionDelta {
-    def apply(value: Int): Either[MessageFormatError, CoapOptionDelta] =
+    def apply(value: Int): IO[MessageFormatError, CoapOptionDelta] =
       // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
       // ... while 13 and 14 lead to special constructs via ext8 and ext16
-      Either.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+      IO.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
   }
 
   @newtype class CoapOptionExtendedDelta private(val value: Int)
 
   object CoapOptionExtendedDelta {
-    def apply(value: Int): Either[MessageFormatError, CoapOptionExtendedDelta] =
+    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedDelta] =
       // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
       // The extension value must be greater than 12 which is a highest non special construct value.
-      Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
   }
 
   @newtype class CoapOptionLength private(val value: Int)
 
   object CoapOptionLength {
-    def apply(value: Int): Either[MessageFormatError, CoapOptionLength] =
+    def apply(value: Int): IO[MessageFormatError, CoapOptionLength] =
       // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
       // ... while 13 and 14 lead to special constructs via ext8 and ext16
-      Either.cond(0 to 15 contains value, value.coerce, InvalidOptionLength(s"$value"))
+      IO.cond(0 to 15 contains value, value.coerce, InvalidOptionLength(s"$value"))
   }
 
   @newtype class CoapOptionExtendedLength private(val value: Int)
 
   object CoapOptionExtendedLength {
-    def apply(value: Int): Either[MessageFormatError, CoapOptionExtendedLength] =
+    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedLength] =
       // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
       // The extension value must be greater than 12 which is a highest non special construct value.
-      Either.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
+      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
   }
 
   @newtype case class CoapOptionOffset(value: Int)
@@ -138,8 +143,8 @@ package object option {
 
     private val numbers = format.keySet
 
-    def apply(value: Int): Either[MessageFormatError, CoapOptionNumber] =
-      Either.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))
+    def apply(value: Int): IO[MessageFormatError, CoapOptionNumber] =
+      IO.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))
   }
 
   sealed trait CoapOptionValueFormat {
@@ -163,9 +168,12 @@ package object option {
   final case class IntCoapOptionValueContent private(value: Int) extends CoapOptionValueContent
 
   object IntCoapOptionValueContent {
-    def apply(raw: Chunk[Byte], range: Range): CoapOptionValueContent =
-      if (range contains raw.size) new IntCoapOptionValueContent(ByteBuffer.wrap(raw.leftPadTo(4, 0.toByte).toArray).getInt)
+    def apply(raw: Chunk[Byte], range: Range): CoapOptionValueContent = {
+      // TODO: Rework model as ZIO => Buffer.byte(raw.leftPadTo(4, 0.toByte)).map(_.getInt))
+      if (range contains raw.size)
+        new IntCoapOptionValueContent(ByteBuffer.wrap(raw.leftPadTo(4, 0.toByte).toArray).getInt)
       else UnrecognizedValueContent
+    }
   }
 
   final case class StringCoapOptionValueContent private(value: String) extends CoapOptionValueContent

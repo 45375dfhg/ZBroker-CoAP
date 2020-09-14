@@ -1,15 +1,14 @@
+package domain.api
 
-import domain.api.CoapDeserializerService.IgnoredMessage
-
-import domain.model.coap.{CoapBody, CoapHeader, CoapMessage, MessageFormatError}
 import domain.model.coap.header._
-
+import domain.model.coap._
 
 object ResponseService {
 
   def deriveResponse(in: Either[(MessageFormatError, CoapId), CoapMessage]): Option[CoapMessage] = in match {
+    // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE!
     case Right(message)  => if (message.isConfirmable) Some(acknowledgeMessage(message.header.msgID)) else None
-    case Left((err, id)) => Some(resetMessage(id)) // do some logging for the error
+    case Left((_, id)) => Some(resetMessage(id)) // TODO: do some logging for the error?
   }
 
   def resetMessage(id: CoapId) =

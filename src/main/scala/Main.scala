@@ -3,13 +3,14 @@ import domain.api.CoapDeserializerService
 import domain.model.chunkstream.ChunkStreamRepository
 
 import infrastructure.environment.{ChunkStreamRepositoryEnvironment, ConfigRepositoryEnvironment, EndpointEnvironment}
-import infrastructure.persistance.chunkstream.OutgoingStream // TODO: remove after testing
+import infrastructure.persistance.chunkstream.OutgoingStream
 
 import zio.App
 import zio.console._
+
 import zio.stream._
 
-object Application extends App {
+object Main extends App {
 
   val program =
     (for {
@@ -18,12 +19,7 @@ object Application extends App {
         ChunkStreamRepository
           .getChunkStream
           .tap(b => putStrLn(b._2.toString))
-          .mapM({ case (_, c) => CoapDeserializerService.extractFromChunk(c) }).collect {
-            case Right(v) => Right(v)
-            case l @ Left((err, opt)) => opt match {
-              case Some(id) => Left(err, id)
-            }
-          }
+          .mapM({ case (_, c) => CoapDeserializerService.extractFromChunk(c) })
           // refactor the inline collect into its own function
           .tap(a => putStrLn(a.toString))
         , OutgoingStream.send)

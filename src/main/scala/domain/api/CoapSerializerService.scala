@@ -46,7 +46,7 @@ object CoapSerializerService {
      * into a Chunk of Byte. Since the internal rep. is checked on creation
      * for correction, this transformation assumes correct values.
      */
-    def generateAllOptions(list: List[CoapOption]): Chunk[Byte] = {
+    def generateAllOptions(list: Chunk[CoapOption]): Chunk[Byte] = {
 
       /**
        * Forms the header as a singular value and prepends it possible Chunks of extended delta and length

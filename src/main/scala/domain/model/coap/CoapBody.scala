@@ -4,7 +4,7 @@ import zio.Chunk
 
 final case class CoapBody(
   token   : Option[CoapToken],
-  options : Option[List[CoapOption]],
+  options : Option[Chunk[CoapOption]],
   payload : Option[CoapPayload]
 )
 
