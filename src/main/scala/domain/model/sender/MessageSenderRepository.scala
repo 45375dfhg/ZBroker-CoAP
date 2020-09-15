@@ -6,7 +6,7 @@ import zio.console.Console
 import zio.{Chunk, Has, ZIO}
 import zio.nio.core.SocketAddress
 
-
+// TODO Remove Console from Environment
 object MessageSenderRepository {
 
   type MessageSenderRepository = Has[MessageSenderRepository.Service]

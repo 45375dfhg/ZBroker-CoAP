@@ -7,7 +7,7 @@ import domain.model.exception.{GatewayError, SystemError}
 import domain.model.sender.MessageSenderRepository
 import zio._
 import zio.console.{Console, putStrLn}
-import zio.nio.core.{Buffer, SocketAddress}
+import zio.nio.core.{Buffer, InetAddress, SocketAddress}
 import zio.nio.core.channels.DatagramChannel
 
 object MessageSenderFromSocket extends MessageSenderRepository.Service {

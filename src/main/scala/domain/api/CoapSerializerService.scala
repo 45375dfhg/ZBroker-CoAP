@@ -29,9 +29,9 @@ object CoapSerializerService {
    * Their prepend complexity is 0(1).
    */
   private def generateHeader(head: CoapHeader): Chunk[Byte] = {
-    ((generateAsByte(head.version) + generateAsByte(head.msgType) + generateAsByte(head.tLength)) +:
-      ((generateAsByte(head.cPrefix) + generateAsByte(head.cSuffix)) +:
-        generateMessageId(head.msgID))).map(_.toByte)
+    (((head.version.value << 6) + (head.msgType.value << 4) + head.tLength.value) +:
+      ((head.cPrefix.value << 5) + head.cSuffix.value) +:
+        generateMessageId(head.msgID)).map(_.toByte)
   }
 
   // TODO: WARNING: TOKEN MODEL NOT DONE AS OF NOW
@@ -53,9 +53,10 @@ object CoapSerializerService {
        * values as well as the related option value.
        */
       def generateOneOption(option: CoapOption): Chunk[Byte] =
-        (generateAsByte(option.delta) + generateAsByte(option.length)).toByte +:
+        (option.delta.value + option.length.value).toByte +:
           (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.optValue))
 
+      // TODO: rewrite line above
       Chunk.fromArray(list.toArray).flatMap(generateOneOption)
     }
 
