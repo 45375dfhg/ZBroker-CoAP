@@ -77,20 +77,8 @@ object CoapSerializerService {
     })
   }
 
-  def generateAsByte[A : Extractor](param: A): Int =
-    param match {
-      case CoapOptionDelta  => param.extract << 4
-      case CoapOptionLength => param.extract
-      case CoapVersion      => param.extract << 6
-      case CoapType         => param.extract << 4
-      case CoapTokenLength  => param.extract
-      case CoapCodePrefix   => param.extract << 5
-      case CoapCodeSuffix   => param.extract
+  def generateAsByte[A : Extractor](param: A): Int = param.extract
 
-        // TODO: MISSING
-      case CoapOptionDelta  => param.extract
-      case
-    }
 
   /**
    * Option Delta and Option Length can but most must be extended. If the internal representation of an Option contain
