@@ -86,6 +86,10 @@ object CoapSerializerService {
       case CoapTokenLength  => param.extract
       case CoapCodePrefix   => param.extract << 5
       case CoapCodeSuffix   => param.extract
+
+        // TODO: MISSING
+      case CoapOptionDelta  => param.extract
+      case
     }
 
   /**

@@ -1,7 +1,10 @@
 package domain.model.exception
 
 // shout out to @Rudder
-trait GatewayError extends Exception with Serializable {
+/**
+ * This is the supertype exception for the whole application
+ */
+trait GatewayError extends Throwable {
 
   def cause(value: Any): String =
     this.getClass.getSimpleName + "failed because of the following value: " + value.toString
@@ -17,4 +20,3 @@ final case class UnexpectedError(msg: String) extends GatewayError
 final case class SystemError(msg: String, cause: Throwable) extends GatewayError {
   override def fullMsg: String = super.fullMsg + cause
 }
-
