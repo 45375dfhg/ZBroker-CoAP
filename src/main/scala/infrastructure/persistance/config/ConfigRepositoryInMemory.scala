@@ -1,7 +1,8 @@
 package infrastructure.persistance.config
 
+import domain.model.BufferModel._
+import domain.model.PortModel._
 import domain.model.config._
-
 import zio._
 
 object ConfigRepositoryInMemory extends ConfigRepository.Service {

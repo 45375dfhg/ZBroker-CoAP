@@ -1,5 +1,7 @@
 package domain.model.config
 
+import domain.model.BufferModel._
+import domain.model.PortModel._
 import zio._
 
 object ConfigRepository {
@@ -20,7 +22,4 @@ object ConfigRepository {
 
   def getOutwardBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
     ZIO.accessM(_.get.getOutwardBufferSize)
-
-
-
 }

@@ -1,15 +1,23 @@
-package domain.model.config
+package domain.model
 
-import java.io.IOException
+import io.estatico.newtype.macros.newtype
+import io.estatico.newtype.ops.toCoercibleIdOps
+
+import domain.model.exception.GatewayError
 
 import zio.IO
 
-final case class Port private(number: Int) extends AnyVal {}
+package object PortModel {
+  @newtype class Port private(val value: Int)
 
-sealed trait PortRangeException extends IOException
-case object UnexpectedPortRangeException extends PortRangeException
+  sealed trait PortRangeException extends GatewayError
+  final case class UnexpectedPortRangeException(err: String) extends PortRangeException {
+    override def msg: String = err
+  }
 
-object Port {
-  def apply(number: Int): IO[PortRangeException, Port] =
-    IO.cond(1 to 65535 contains number, new Port(number), UnexpectedPortRangeException)
+  object Port {
+    def apply(value: Int): IO[PortRangeException, Port] =
+      IO.cond(1 to 65535 contains value, value.coerce, UnexpectedPortRangeException(s"$value"))
+  }
 }
+
