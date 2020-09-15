@@ -1,18 +1,20 @@
 package domain.api
 
+import domain.api.CoapDeserializerService.IgnoredMessage
 import domain.model.coap.header._
 import domain.model.coap._
-import zio.Chunk
+import domain.model.exception.{GatewayError, NoResponse}
+import zio.{Chunk, IO}
 
 object ResponseService {
 
-  val initialResponse: Either[(MessageFormatError, CoapId), CoapMessage] => Option[Chunk[Byte]] =
-    deriveResponse _ andThen convertResponse
+  def getResponse(msg: Either[IgnoredMessage, CoapMessage]): IO[GatewayError, Chunk[Byte]] =
+    IO.fromOption((deriveResponse _ andThen convertResponse) (msg)).orElseFail(NoResponse)
 
   val piggyResponse = ???
 
   // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE! // TODO: do some logging for the error?
-  private def deriveResponse(msgE: Either[(MessageFormatError, CoapId), CoapMessage]): Option[CoapMessage] =
+  private def deriveResponse(msgE: Either[IgnoredMessage, CoapMessage]): Option[CoapMessage] =
     msgE match {
       case Right(message) if message.isConfirmable => Some(acknowledgeMessage(message.header.msgID))
       case Left((_, id))                           => Some(resetMessage(id))
