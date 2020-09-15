@@ -8,6 +8,10 @@ final case class CoapBody(
   payload : Option[CoapPayload]
 )
 
+object CoapBody {
+  val empty = CoapBody(None, None, None)
+}
+
 // TODO: Implement
 final case class CoapToken(value: Chunk[Byte])
 

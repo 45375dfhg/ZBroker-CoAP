@@ -14,6 +14,26 @@ final case class CoapHeader(
   msgID   : CoapId
 )
 
+object CoapHeader {
+  def ack(id: CoapId) = CoapHeader(
+    CoapVersion.default,
+    CoapType.acknowledge,
+    CoapTokenLength.empty,
+    CoapCodePrefix.empty,
+    CoapCodeSuffix.empty,
+    id
+  )
+
+  def reset(id: CoapId) = CoapHeader(
+    CoapVersion.default,
+    CoapType.reset,
+    CoapTokenLength.empty,
+    CoapCodePrefix.empty,
+    CoapCodeSuffix.empty,
+    id
+  )
+}
+
 package object header {
 
   @newtype class CoapVersion private(val value: Int)
@@ -33,8 +53,8 @@ package object header {
       // #rfc7252 accepts 4 different types in a 2-bit window
       IO.cond(0 to 3 contains value, value.coerce, InvalidCoapType(s"$value"))
 
-    val empty: CoapType       = 3.coerce
-    val acknowledge: CoapType = 2.coerce
+    val acknowledge : CoapType = 2.coerce
+    val reset       : CoapType = 3.coerce
   }
 
   @newtype class CoapTokenLength private(val value: Int)

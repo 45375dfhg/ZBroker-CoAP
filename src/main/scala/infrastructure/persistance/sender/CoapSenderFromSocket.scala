@@ -18,5 +18,5 @@ object CoapSenderFromSocket extends CoapSenderRepository.Service {
       size   <- ConfigRepository.getOutwardBufferSize
       buffer <- Buffer.byte(size.value)
 
-    } yield ()).refineToOrDie[SystemError]
+    } yield ()).refineToOrDie[SystemError] // TODO: Precise the conversion
 }

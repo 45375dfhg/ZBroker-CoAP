@@ -117,7 +117,6 @@ object CoapSerializerService {
     case c : OpaqueCoapOptionValueContent  => c.value
     case EmptyCoapOptionValueContent       => Chunk.empty
     case UnrecognizedValueContent          => Chunk.empty
-    case _                            => Chunk.empty // TODO: REMOVE
   }
 
   // TODO: Refactor
