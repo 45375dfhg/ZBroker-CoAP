@@ -8,13 +8,19 @@ object ConfigRepository {
 
   trait Service {
     def getPrimaryUDPPort: IO[PortRangeException, Port]
-    def getBufferSize: IO[BufferSizeException, BufferSize]
+    def getInwardBufferSize: IO[BufferSizeException, BufferSize]
+    def getOutwardBufferSize: IO[BufferSizeException, BufferSize]
   }
 
   def getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
     ZIO.accessM(_.get.getPrimaryUDPPort)
 
-  def getBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
-    ZIO.accessM(_.get.getBufferSize)
+  def getInwardBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
+    ZIO.accessM(_.get.getInwardBufferSize)
+
+  def getOutwardBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
+    ZIO.accessM(_.get.getOutwardBufferSize)
+
+
 
 }

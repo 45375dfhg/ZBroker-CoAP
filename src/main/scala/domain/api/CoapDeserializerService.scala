@@ -79,11 +79,11 @@ object CoapDeserializerService {
         rem.headOption match {
           // recursively iterates over the chunk and builds a list of the options or throws an exception
           case Some(b) if b != 0xFF.toByte =>
-            parseNextOption(b, rem, num).flatMap(o => getOptionsAsListFrom(rem.drop(o.offset.value), o +: acc, o.number.value))
+            parseNextOption(b, rem, num).flatMap(o => getOptionsAsListFrom(rem.drop(o.offset.value), acc :+ o, o.number.value))
           // a payload marker was detected - according to protocol this fails if there is a marker but no load
-          case Some(_) => if (rem.tail.nonEmpty) IO.succeed(acc.reverse, rem.drop(1))
+          case Some(_) => if (rem.tail.nonEmpty) IO.succeed(acc, rem.drop(1))
                           else IO.fail(InvalidPayloadMarker("Promised payload is missing. Protocol error."))
-          case None    => IO.succeed(acc.reverse, Chunk.empty)
+          case None    => IO.succeed(acc, Chunk.empty)
         }
     }
 

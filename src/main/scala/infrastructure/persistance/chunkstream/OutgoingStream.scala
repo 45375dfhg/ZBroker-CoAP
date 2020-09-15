@@ -1,9 +1,10 @@
 package infrastructure.persistance.chunkstream
 
+import domain.model.chunkstream.ChunkStreamRepository.Channel
 import zio.clock.Clock
 import zio.console._
 import zio.duration._
-import zio.{Has, Schedule, ZIO}
+import zio.{Schedule, ZIO}
 import zio.nio.core.channels.DatagramChannel
 import zio.nio.core.{Buffer, SocketAddress}
 import zio.stream.ZStream
@@ -11,7 +12,7 @@ import zio.stream.ZStream
 // TODO: Burn this down
 object OutgoingStream {
 
-  def send: ZStream[Console with Has[DatagramChannel] with Clock, Exception, Int] =
+  def send: ZStream[Console with Channel with Clock, Exception, Int] =
     ZStream.repeatEffectWith( {
       for {
         buffer  <- Buffer.byte(20)

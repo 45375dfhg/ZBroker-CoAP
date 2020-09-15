@@ -16,7 +16,7 @@ object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
   ZStream[ConfigRepository with Has[DatagramChannel], GatewayError, (Option[SocketAddress], Chunk[Byte])] =
     ZStream.repeatEffect {
       (for {
-        size   <- ConfigRepository.getBufferSize
+        size   <- ConfigRepository.getInwardBufferSize
         buffer <- Buffer.byte(size.value)
         server <- ZIO.service[DatagramChannel]
         origin <- server.receive(buffer)
