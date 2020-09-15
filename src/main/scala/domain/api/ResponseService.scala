@@ -11,13 +11,15 @@ object ResponseService {
     case Left((_, id)) => Some(resetMessage(id)) // TODO: do some logging for the error?
   }
 
-  def resetMessage(id: CoapId) =
+  def
+
+  private def resetMessage(id: CoapId) =
     CoapMessage(
       CoapHeader(
         CoapVersion.default, CoapType.acknowledge, CoapTokenLength.empty, CoapCodePrefix.empty, CoapCodeSuffix.empty, id),
       CoapBody(None, None, None))
 
-  def acknowledgeMessage(id: CoapId) =
+  private def acknowledgeMessage(id: CoapId) =
     CoapMessage(
       CoapHeader(
         CoapVersion.default, CoapType.empty, CoapTokenLength.empty, CoapCodePrefix.empty, CoapCodeSuffix.empty, id),
