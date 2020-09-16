@@ -49,10 +49,12 @@ package object option {
   @newtype class CoapOptionLength private(val value: Int)
 
   object CoapOptionLength {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionLength] =
+    def apply(value: Int): IO[MessageFormatError, CoapOptionLength] = {
       // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
       // ... while 13 and 14 lead to special constructs via ext8 and ext16
-      IO.cond(0 to 15 contains value, value.coerce, InvalidOptionLength(s"$value"))
+      // WARNING: This is an "open" bounded implementation! Errors must be caught on creation.
+      IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
+    }
   }
 
   @newtype class CoapOptionExtendedLength private(val value: Int)

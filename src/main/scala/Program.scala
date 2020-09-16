@@ -1,6 +1,6 @@
 
 import Controller._
-import domain.api.CoapDeserializerService.{IgnoredMessage, IgnoredMessageOption}
+import domain.api.CoapDeserializerService.{IgnoredMessageWithId, IgnoredMessageWithIdOption}
 import domain.api._
 import domain.model.chunkstream.ChunkStreamRepository
 import domain.model.coap._
@@ -32,7 +32,7 @@ object Program {
 
   // derive reply *> if reply send it *> in next tap push to STM no matter what
 
-  private def containsId: PartialFunction[Either[IgnoredMessageOption, CoapMessage], Either[IgnoredMessage, CoapMessage]] = {
+  private def containsId: PartialFunction[Either[IgnoredMessageWithIdOption, CoapMessage], Either[IgnoredMessageWithId, CoapMessage]] = {
     case Right(m)                          => Right(m)
     case Left((err, opt)) if opt.isDefined => Left(err, opt.get) // this is not very idiomatic since it's using .get!
   }

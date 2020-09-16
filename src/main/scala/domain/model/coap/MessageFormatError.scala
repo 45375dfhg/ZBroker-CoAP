@@ -24,7 +24,9 @@ final case class InvalidOptionValue(msg: String)      extends MessageFormatError
 
 final case class InvalidCoapOptionNumber(msg: String) extends MessageFormatError
 
-final case class InvalidPayloadMarker(msg: String)    extends MessageFormatError
+case object InvalidPayloadMarker                      extends MessageFormatError {
+  override def msg = "Promised Payload missing."
+}
 
 final case class InvalidCoapChunkSize(msg: String)    extends MessageFormatError
 

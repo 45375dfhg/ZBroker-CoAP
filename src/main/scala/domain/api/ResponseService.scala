@@ -1,6 +1,6 @@
 package domain.api
 
-import domain.api.CoapDeserializerService.IgnoredMessage
+import domain.api.CoapDeserializerService.IgnoredMessageWithId
 import domain.model.coap.header._
 import domain.model.coap._
 import domain.model.exception.NoResponseAvailable
@@ -9,18 +9,18 @@ import zio.{Chunk, IO}
 
 object ResponseService {
 
-  def getResponse(msg: Either[IgnoredMessage, CoapMessage]) =
+  def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
     IO.fromEither((generateResponse _ andThen convertResponse) (msg))
 
   // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE! // TODO: do some logging for the error?
-  private def generateResponse(msg: Either[IgnoredMessage, CoapMessage]): Either[NoResponseAvailable, CoapMessage] =
+  private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[NoResponseAvailable, CoapMessage] =
     msg match {
       case Right(message) if message.isConfirmable => Right(acknowledgeMessage(message.header.msgID))
       case Left((_, id))                           => Right(resetMessage(id))
       case _                                       => Left(NoResponseAvailable)
     }
 
-  def hasResponse(msg: Either[IgnoredMessage, CoapMessage]): Boolean =
+  def hasResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Boolean =
     msg match {
       case Right(message) if message.isConfirmable => true
       case Left((_, _))                            => true

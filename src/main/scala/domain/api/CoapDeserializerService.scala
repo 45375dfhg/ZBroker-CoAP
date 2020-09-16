@@ -6,7 +6,7 @@ import domain.model.coap.option._
 
 import Numeric.Implicits._
 import utility.ChunkExtension._
-import zio.{Chunk, IO, UIO, URIO}
+import zio.{Chunk, IO, UIO, URIO, ZIO}
 
 
 /**
@@ -15,8 +15,8 @@ import zio.{Chunk, IO, UIO, URIO}
  */
 object CoapDeserializerService {
 
-  type IgnoredMessageOption = (MessageFormatError, Option[CoapId])
-  type IgnoredMessage       = (MessageFormatError, CoapId)
+  type IgnoredMessageWithIdOption = (MessageFormatError, Option[CoapId])
+  type IgnoredMessageWithId       = (MessageFormatError, CoapId)
   /**
    * Takes a chunk and attempts to convert it into a CoapMessage.
    * <p>
@@ -27,7 +27,7 @@ object CoapDeserializerService {
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
   /*_*/ // IntelliJ Highlighting is broken for the return type
-  def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
+  def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[IgnoredMessageWithIdOption, CoapMessage]] =
     (for {
       header  <- chunk.takeExactly(4).flatMap(headerFromChunk)
       body    <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
@@ -61,113 +61,93 @@ object CoapDeserializerService {
    */
   private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): IO[MessageFormatError, CoapBody] = {
 
-    /**
-     * Recursively iterates over the chunk. It checks the current head for existence and on existence whether the
-     * head is equal to the payload marker.
-     *
-     * @param rem the remainder of the Chunk[Byte] which is also the remainder of Datagram as a whole. The initial value
-     *            should be the whole Datagram excluding the Header as well as the Token.
-     * @param acc the accumulator that holds the Options that were gathered so far.
-     * @param num a tracker for the sum of all deltas and therefore the last accessed option number
-     * @return Either an exception or a list of all options and possibly a payload in an option monad
-     */
-    def getOptionsAsListFrom(
-        rem: Chunk[Byte],
-        acc: Chunk[CoapOption] = Chunk.empty,
-        num: Int = 0
-      ): IO[MessageFormatError, (Chunk[CoapOption], Chunk[Byte])] = {
-        rem.headOption match {
-          // recursively iterates over the chunk and builds a list of the options or throws an exception
-          case Some(b) if b != 0xFF.toByte =>
-            parseNextOption(b, rem, num).flatMap(o => getOptionsAsListFrom(rem.drop(o.offset.value), acc :+ o, o.number.value))
-          // a payload marker was detected - according to protocol this fails if there is a marker but no load
-          case Some(_) => if (rem.tail.nonEmpty) IO.succeed(acc, rem.drop(1))
-                          else IO.fail(InvalidPayloadMarker("Promised payload is missing. Protocol error."))
-          case None    => IO.succeed(acc, Chunk.empty)
-        }
-    }
-
-    // extract the token and continue with the remainder
-    val tokenLength = header.tLength.value
-
-    // makes use of the tokenLength defined above
     def extractTokenFrom(chunk: Chunk[Byte]): IO[MessageFormatError, CoapToken] =
-      chunk.takeExactly(tokenLength).map(CoapToken)
+      chunk.takeExactly(header.tLength.value).map(CoapToken)
 
-    // sequentially extract the token, then all the options and lastly gets the payload
+    type OptionListAndPayload = (Chunk[CoapOption], Chunk[Byte])
+
+    def getOptionListFrom(
+      chunk: Chunk[Byte], acc: Chunk[CoapOption] = Chunk.empty, num: Int = 0
+    ): IO[MessageFormatError, OptionListAndPayload] =
+      chunk.headOption match {
+        case Some(b) =>
+          if (b == 0xFF.toByte) IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker)
+          // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+        case None => IO.succeed(acc, Chunk.empty)
+      }
+
+    def getNextOption(chunk: Chunk[Byte], num: Int): IO[MessageFormatError, CoapOption] =
+      for {
+        header      <- chunk.takeExactly(1).map(_.head)
+        body        <- chunk.dropExactly(1)
+        (d, ed, od) <- getDeltaTriplet(header, body)
+        (l, el, ol) <- getLengthTriplet(header, body, od)
+        length      <- getLength(l, el)
+        number      <- getNumber(d, ed, num)
+        value       <- getValue(body, l, od + ol, number)
+        totalOffset  = CoapOptionOffset(od.value + ol.value + length.value + 1)
+      } yield CoapOption(d, ed, l, el, number, value, totalOffset)
+
     for {
       token              <- extractTokenFrom(chunk)
-      remainder          <- chunk.dropExactly(tokenLength)
-      optsPay            <- getOptionsAsListFrom(remainder)
-      (options, payload) = optsPay
+      remainder          <- chunk.dropExactly(header.tLength.value)
+      (options, payload) <- getOptionListFrom(remainder)
       tokenO             = Option.when(token.value.nonEmpty)(token)
       optionsO           = Option.when(options.nonEmpty)(options)
       // TODO: THIS IS AN EITHER - PAYLOAD CONVERSION CAN FAIL (e.g. in case of JSON)!
-      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options))) // TODO: HERE
+      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 
-  private def parseNextOption(optionHeader: Byte, chunk: Chunk[Byte], num: Int): IO[MessageFormatError, CoapOption] = {
-    val optionBody = chunk.drop(1) // option header is always one byte - empty check happens during parameter extraction
-    for {
-      (delta,  extDelta,  deltaOffset)  <- getDelta(optionHeader, optionBody)
-      (length, extLength, lengthOffset) <- getLength(optionHeader, optionBody, deltaOffset)
-      number                            <- extDelta match {
-                                              case Some(ext) => CoapOptionNumber(ext.value + num)
-                                              case None      => CoapOptionNumber(num + delta.value)
-                                           }
-      // get the value starting at the position based on the two offsets, ending at that value plus the length value
-      value         <- getValue(optionBody, length, deltaOffset + lengthOffset, number)
-      // offset can be understood as the size of the parameter group
-      offset         = CoapOptionOffset(deltaOffset.value + lengthOffset.value + length.value + 1)
-    } yield CoapOption(delta, extDelta, length, extLength, number, value, offset)
-  }
+  type DeltaTriplet = (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)
 
-  // TODO: Refactor
-  private def getDelta(
-    headerByte: Byte,
-    remainder: Chunk[Byte]
-  ): IO[MessageFormatError, (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)] =
+  private def getDeltaTriplet(headerByte: Byte, remainder: Chunk[Byte]): IO[MessageFormatError, DeltaTriplet] =
     (headerByte & 0xF0) >>> 4 match {
       case 13 => for {
-          i <- getFirstByteFrom(remainder)
-          d <- CoapOptionDelta(13)
-          e <- CoapOptionExtendedDelta(i + 13)
-        } yield (d, Some(e), CoapOptionOffset(1))
+          ext <- getFirstByteFrom(remainder) >>= (n => CoapOptionExtendedDelta(n + 13))
+          del <- CoapOptionDelta(13)
+        } yield (del, Some(ext), CoapOptionOffset(1))
       case 14 => for {
-          i <- getFirstTwoBytesAsInt(remainder.take(2))
-          d <- CoapOptionDelta(14)
-          e <- CoapOptionExtendedDelta(i + 269)
-        } yield (d, Some(e), CoapOptionOffset(2))
+          ext <- mergeNextTwoBytes(remainder) >>= (n => CoapOptionExtendedDelta(n + 269))
+          del <- CoapOptionDelta(14)
+        } yield (del, Some(ext), CoapOptionOffset(2))
       case 15 => IO.fail(InvalidOptionDelta("15 is a reserved value."))
-      case other if 0 to 12 contains other => for {
-          d <- CoapOptionDelta(other)
-        } yield (d, None, CoapOptionOffset(0))
-      case e => IO.fail(InvalidOptionDelta(s"Illegal delta value of $e. Initial value must be between 0 and 15."))
+      case other if 0 to 12 contains other => CoapOptionDelta(other).map((_, None, CoapOptionOffset(0)))
+      case error => IO.fail(InvalidOptionDelta(s"$error"))
     }
 
-  // TODO: Refactor
-  private def getLength(
-    headerByte: Byte,
-    remainder: Chunk[Byte],
-    deltaOffset: CoapOptionOffset
-  ): IO[MessageFormatError, (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)] =
+  type LengthTriplet = (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)
+
+  private def getLengthTriplet(
+    headerByte : Byte,
+    remainder  : Chunk[Byte],
+    curOffset  : CoapOptionOffset
+  ): IO[MessageFormatError, LengthTriplet] =
     headerByte & 0x0F match {
       case 13 => for {
-          i <- getFirstByteFrom(remainder.drop(deltaOffset.value).take(1))
-          l <- CoapOptionLength(13)
-          e <- CoapOptionExtendedLength(i + 13)
-        } yield (l, Some(e), CoapOptionOffset(2))
+          ext <- remainder.dropExactly(curOffset.value) >>= getFirstByteFrom >>= (n => CoapOptionExtendedLength(n + 13))
+          len <- CoapOptionLength(13)
+        } yield (len, Some(ext), CoapOptionOffset(2))
       case 14 => for {
-          i <- getFirstTwoBytesAsInt(remainder.drop(deltaOffset.value).take(2))
-          l <- CoapOptionLength(14)
-          e <- CoapOptionExtendedLength(i + 269)
-        } yield (l, Some(e), CoapOptionOffset(2))
+          ext <- remainder.dropExactly(curOffset.value) >>= mergeNextTwoBytes >>= (n => CoapOptionExtendedLength(n + 13))
+          len <- CoapOptionLength(14)
+        } yield (len, Some(ext), CoapOptionOffset(2))
       case 15 => IO.fail(InvalidOptionLength("15 is a reserved length value."))
-      case other if 0 to 12 contains other => for {
-          l <- CoapOptionLength(other)
-       } yield (l, None, CoapOptionOffset(0))
-      case e => IO.fail(InvalidOptionLength(s"Illegal length value of $e. Initial value must be between 0 and 15"))
+      case other if 0 to 12 contains other => CoapOptionLength(other).map((_, None, CoapOptionOffset(0)))
+      case error => IO.fail(InvalidOptionLength(s"$error"))
+    }
+
+  private def getNumber(delta: CoapOptionDelta, extendedDelta: Option[CoapOptionExtendedDelta], num: Int) =
+    extendedDelta match {
+      case Some(ext) => CoapOptionNumber(ext.value + num)
+      case None      => CoapOptionNumber(num + delta.value)
+    }
+
+  private def getLength(length: CoapOptionLength, extendedLength: Option[CoapOptionExtendedLength]) =
+    extendedLength match {
+      case Some(ext) => CoapOptionLength(ext.value)
+      case None      => IO.succeed(length)
     }
 
   private def getValue(
@@ -182,7 +162,7 @@ object CoapDeserializerService {
     bytes.takeExactly(1).map(_.head.toInt)
 
   // TODO: 0xFF necessary?
-  private def getFirstTwoBytesAsInt(bytes: Chunk[Byte]): IO[MessageFormatError, Int] =
+  private def mergeNextTwoBytes(bytes: Chunk[Byte]): IO[MessageFormatError, Int] =
     bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
 
   private def getVersionFrom(b: Byte): IO[MessageFormatError, CoapVersion] =
@@ -207,8 +187,10 @@ object CoapDeserializerService {
     raw.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => getMsgIdFrom(c(0), c(1))).option
 
   /**
-   * As long as the number of options per message are low the function complexity does not matter in comparison
-   * to the overhead and therefore this is preferable to an HashMap solution
+   * The media type of the payload is defined via CoapOption #12. This option should always have
+   * its content initialized as IntCoapOptionValueContent - therefore the CoapPayloadMediaType
+   * can be derived via the provided int value. If this fails or the option itself is missing,
+   * a placeholder MediaType is passed.
    */
   private def getPayloadMediaTypeFrom(list: Chunk[CoapOption]): CoapPayloadMediaType =
     list.find(_.number.value == 12) match {
