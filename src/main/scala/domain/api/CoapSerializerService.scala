@@ -78,8 +78,7 @@ object CoapSerializerService {
     })
   }
 
-  def generateAsByte[A : Extractor](param: A): Int = param.extract
-
+  // def generateAsByte[A : Extractor](param: A): Int = param.extract
 
   /**
    * Option Delta and Option Length can but most must be extended. If the internal representation of an Option contain

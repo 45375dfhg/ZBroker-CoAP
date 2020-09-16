@@ -107,22 +107,15 @@ object CoapDeserializerService {
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 
-  private def parseNextOption(
-    optionHeader: Byte,
-    chunk: Chunk[Byte],
-    num: Int
-  ): IO[MessageFormatError, CoapOption] = {
-    // option header is always one byte - empty check happens during parameter extraction
-    val optionBody = chunk.drop(1)
+  private def parseNextOption(optionHeader: Byte, chunk: Chunk[Byte], num: Int): IO[MessageFormatError, CoapOption] = {
+    val optionBody = chunk.drop(1) // option header is always one byte - empty check happens during parameter extraction
     for {
-      // extract delta value from header, possibly extend to second and third byte and pass resulting offset
-      deltaTriplet  <- getDelta(optionHeader, optionBody)
-      (delta, extDelta, deltaOffset) = deltaTriplet
-      // extract length value from header, possible extension which depends on the offset of the delta value, pass offset
-      lengthTriplet <- getLength(optionHeader, optionBody, deltaOffset)
-      (length, extLength, lengthOffset) = lengthTriplet
-      // get the new number as a sum of all previous deltas given by the num parameter and the newest delta
-      number        <- CoapOptionNumber(num + delta.value)
+      (delta,  extDelta,  deltaOffset)  <- getDelta(optionHeader, optionBody)
+      (length, extLength, lengthOffset) <- getLength(optionHeader, optionBody, deltaOffset)
+      number                            <- extDelta match {
+                                              case Some(ext) => CoapOptionNumber(ext.value + num)
+                                              case None      => CoapOptionNumber(num + delta.value)
+                                           }
       // get the value starting at the position based on the two offsets, ending at that value plus the length value
       value         <- getValue(optionBody, length, deltaOffset + lengthOffset, number)
       // offset can be understood as the size of the parameter group

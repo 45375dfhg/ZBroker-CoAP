@@ -105,6 +105,7 @@ package object option {
     def getProperties(number: CoapOptionNumber): (Boolean, Boolean, Boolean, Boolean) =
       properties(number.value)
 
+    // https://tools.ietf.org/html/rfc7959#section-2.1
     private val format: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
       1  -> (OpaqueOptionValueFormat, 0 to 8),
       3  -> (StringOptionValueFormat, 1 to 255),
@@ -118,6 +119,8 @@ package object option {
       15 -> (StringOptionValueFormat, 0 to 255),
       17 -> (IntOptionValueFormat,    0 to 2),
       20 -> (StringOptionValueFormat, 0 to 255),
+      23 -> (IntOptionValueFormat,    0 to 3),
+      27 -> (IntOptionValueFormat,    0 to 3),
       35 -> (StringOptionValueFormat, 1 to 1034),
       39 -> (StringOptionValueFormat, 1 to 255),
       60 -> (IntOptionValueFormat,    0 to 4)
@@ -136,6 +139,8 @@ package object option {
       15 -> (true,  true,  false, true),
       17 -> (true,  false, false, false),
       20 -> (false, false, false, true),
+      23 -> (true,  true,  false, false),
+      27 -> (true,  true,  false, false),
       35 -> (true,  true,  false, false),
       39 -> (true,  true,  false, false),
       60 -> (false, false, true,  true)

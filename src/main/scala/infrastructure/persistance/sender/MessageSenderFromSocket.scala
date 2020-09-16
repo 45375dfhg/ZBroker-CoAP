@@ -1,6 +1,7 @@
 package infrastructure.persistance.sender
 
 import java.io.IOException
+import java.net.InetSocketAddress
 
 import domain.model.chunkstream.ChunkStreamRepository.Channel
 import domain.model.exception.{GatewayError, SystemError}
@@ -17,6 +18,6 @@ object MessageSenderFromSocket extends MessageSenderRepository.Service {
       buffer  <- Buffer.byte(msg)
       server  <- ZIO.service[DatagramChannel]
       _       <- server.send(buffer, to)
-      _       <- putStrLn(to.toString + " -- " + msg.toString)
+      //_       <- putStrLn(to.toString + " -- " + msg.toString)
     } yield ()).refineOrDieWith(PartialFunction.empty)(_ => new Throwable("dead")) // TODO: proper refinement
 }
