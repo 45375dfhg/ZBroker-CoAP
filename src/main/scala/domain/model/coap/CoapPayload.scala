@@ -10,19 +10,22 @@ sealed trait CoapPayload
 // TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
 final case class TextCoapPayload private(value: String) extends CoapPayload
 
-object TextCoapPayload { // Either[InvalidPayloadStructure,
+object TextCoapPayload {
   def apply(chunk: Chunk[Byte]): TextCoapPayload =
     new TextCoapPayload(chunk.map(_.toChar).mkString)
 }
+
 final case class UnknownPayload (value: Chunk[Byte]) extends CoapPayload
 
 // TODO: Implement the other Media Types
+// This might not be necessary as long as data is just passed!
+// A downstream participant could simply parse the data by themself
 
 sealed trait CoapPayloadMediaType {
   def transform(chunk: Chunk[Byte]): CoapPayload = this match {
     case TextMediaType     => TextCoapPayload(chunk)
     case SniffingMediaType => TextCoapPayload(chunk) // placeholder
-    case _                 => UnknownPayload(chunk)
+    case _                 => TextCoapPayload(chunk) // placeholder
   }
 }
 

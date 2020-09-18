@@ -29,8 +29,8 @@ object CoapDeserializerService {
   /*_*/ // IntelliJ Highlighting is broken for the return type
   def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[IgnoredMessageWithIdOption, CoapMessage]] =
     (for {
-      header  <- chunk.takeExactly(4).flatMap(headerFromChunk)
-      body    <- chunk.dropExactly(4).flatMap(bodyFromChunk(_, header))
+      header  <- chunk.takeExactly(4) >>= headerFromChunk
+      body    <- chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
       message <- validateMessage(header, body)
     } yield message).flatMapError(err => URIO(err) <*> getMsgIdFromMessage(chunk)).either
   /*_*/
@@ -40,6 +40,7 @@ object CoapDeserializerService {
    */
   private def headerFromChunk(chunk: Chunk[Byte]): IO[MessageFormatError, CoapHeader] = {
     val (b1, b2, b3, b4) = (chunk(0), chunk(1), chunk(2), chunk(3))
+
     for {
       version <- getVersionFrom(b1)
       msgType <- getMsgTypeFrom(b1)
@@ -90,18 +91,20 @@ object CoapDeserializerService {
       } yield CoapOption(d, ed, l, el, number, value, totalOffset)
 
     for {
-      token              <- extractTokenFrom(chunk)
-      remainder          <- chunk.dropExactly(header.tLength.value)
+      (token, remainder) <- extractTokenFrom(chunk) <&> chunk.dropExactly(header.tLength.value)
       (options, payload) <- getOptionListFrom(remainder)
       tokenO             = Option.when(token.value.nonEmpty)(token)
       optionsO           = Option.when(options.nonEmpty)(options)
-      // TODO: THIS IS AN EITHER - PAYLOAD CONVERSION CAN FAIL (e.g. in case of JSON)!
       payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 
   type DeltaTriplet = (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)
 
+  /**
+   * @return a triplet which contains a CoapOptionDelta, an Option of an CoapOptionExtendedDelta as well as
+   *         the CoapOptionOffset that follows from the existence or absence of an possibly extended delta
+   */
   private def getDeltaTriplet(headerByte: Byte, remainder: Chunk[Byte]): IO[MessageFormatError, DeltaTriplet] =
     (headerByte & 0xF0) >>> 4 match {
       case 13 => for {
@@ -119,6 +122,15 @@ object CoapDeserializerService {
 
   type LengthTriplet = (CoapOptionLength, Option[CoapOptionExtendedLength], CoapOptionOffset)
 
+  /**
+   *
+   * @param headerByte the option header byte
+   * @param remainder everything but the option header byte
+   * @param curOffset the offset that stems from a possible extended delta value -
+   *                  the starting point of an extended length value
+   * @return a triplet which contains a CoapOptionLength, an Option of an CoapOptionExtendedLength as well as
+   *         the CoapOptionOffset that follows from the existence or absence of an possibly extended length
+   */
   private def getLengthTriplet(
     headerByte : Byte,
     remainder  : Chunk[Byte],

@@ -56,8 +56,7 @@ object CoapSerializerService {
         (option.delta.value + option.length.value).toByte +:
           (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.optValue))
 
-      // TODO: rewrite line above
-      Chunk.fromArray(list.toArray).flatMap(generateOneOption)
+      list.flatMap(generateOneOption)
     }
 
     // TODO: IMPLEMENT the other payload types
@@ -78,12 +77,10 @@ object CoapSerializerService {
     })
   }
 
-  // def generateAsByte[A : Extractor](param: A): Int = param.extract
-
   /**
-   * Option Delta and Option Length can but most must be extended. If the internal representation of an Option contain
-   * an extended value that value might be of size one or two Bytes. This functions returns the respective Chunk[Byte]
-   * presentation of the saved Integer value.
+   * Option Delta and Option Length can but most not be extended. If the internal representation of an Option contains
+   * an extended value, that value might be of size one or two bytes. This functions returns the respective Chunk[Byte]
+   * presentation of the saved Integer value. Additionally, it subtracts either 13 or 269 from the value.
    *
    * @param opt An Option of an Extractor member.
    * @tparam A An Extractor type class member - all members are value classes,
@@ -92,8 +89,8 @@ object CoapSerializerService {
    */
   private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
     opt.fold(Chunk[Byte]()) { e =>
-      if (e.extract < 269) Chunk(e.extract.toByte)
-      else Chunk(((e.extract >> 8) & 0xFF).toByte, (e.extract & 0xFF).toByte)
+      if (e.extract < 269) Chunk((e.extract - 13).toByte)
+      else Chunk((((e.extract - 269) >> 8) & 0xFF).toByte, ((e.extract - 269) & 0xFF).toByte)
     }
 
   /**
@@ -111,6 +108,5 @@ object CoapSerializerService {
     case UnrecognizedValueContent          => Chunk.empty
   }
 
-  // TODO: Refactor
   private def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 }

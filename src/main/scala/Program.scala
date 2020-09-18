@@ -37,5 +37,5 @@ object Program {
     case Left((err, opt)) if opt.isDefined => Left(err, opt.get) // this is not very idiomatic since it's using .get!
   }
 
-  private val ignore = MissingCoapId
+  private val ignore = MissingCoapId // wrong - should be an actual unexpected kind of exception
 }
