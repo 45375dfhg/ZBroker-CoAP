@@ -80,22 +80,26 @@ object CoapDeserializerService {
 
     def getNextOption(chunk: Chunk[Byte], num: Int): IO[MessageFormatError, CoapOption] =
       for {
-        header      <- chunk.takeExactly(1).map(_.head)
-        body        <- chunk.dropExactly(1)
-        (d, ed, od) <- getDeltaTriplet(header, body)
-        (l, el, ol) <- getLengthTriplet(header, body, od)
-        length      <- getLength(l, el)
-        number      <- getNumber(d, ed, num)
-        value       <- getValue(body, l, od + ol, number)
-        totalOffset  = CoapOptionOffset(od.value + ol.value + length.value + 1)
+        header       <- chunk.takeExactly(1).map(_.head)
+        body         <- chunk.dropExactly(1)
+        deltaTriplet <- getDeltaTriplet(header, body)
+        (d, ed, od)   = deltaTriplet
+        lenTriplet   <- getLengthTriplet(header, body, od)
+        (l, el, ol)   = lenTriplet
+        length       <- getLength(l, el)
+        number       <- getNumber(d, ed, num)
+        value        <- getValue(body, l, od + ol, number)
+        totalOffset   = CoapOptionOffset(od.value + ol.value + length.value + 1)
       } yield CoapOption(d, ed, l, el, number, value, totalOffset)
 
     for {
-      (token, remainder) <- extractTokenFrom(chunk) <&> chunk.dropExactly(header.tLength.value)
-      (options, payload) <- getOptionListFrom(remainder)
-      tokenO             = Option.when(token.value.nonEmpty)(token)
-      optionsO           = Option.when(options.nonEmpty)(options)
-      payloadO           = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
+      tuple1             <- extractTokenFrom(chunk) <&> chunk.dropExactly(header.tLength.value)
+      (token, remainder)  = tuple1
+      tuple2             <- getOptionListFrom(remainder)
+      (options, payload)  = tuple2
+      tokenO              = Option.when(token.value.nonEmpty)(token)
+      optionsO            = Option.when(options.nonEmpty)(options)
+      payloadO            = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
     } yield CoapBody(tokenO, optionsO, payloadO)
   }
 

@@ -22,10 +22,11 @@ object Program {
   val coapStream =
     ChunkStreamRepository
       .getChunkStream
-      .buffer(1024) // TODO: Necessary?
       .mapM({ case (i, c) => UIO(i) <*> CoapDeserializerService.extractFromChunk(c).collect(ignore)(containsId) })
-      .buffer(1024)
-      .tap( { case (i, c) => IO.fromOption(i).orElseFail(MissingAddress) <*> ResponseService.getResponse(c) >>= (t => MessageSenderRepository.sendMessage(t._1, t._2)) })
+      .tap(o => putStrLn(o._2.toString))
+      .tap( { case (i, c) =>
+        UIO.succeed(i) <*> ResponseService.getResponse(c) >>= (t => MessageSenderRepository.sendMessage(t._1, t._2))
+      })
       .tap(o => putStrLn(o._2.toString))
 
   // .partition(o => ResponseService.hasResponse(o._2), 2048)

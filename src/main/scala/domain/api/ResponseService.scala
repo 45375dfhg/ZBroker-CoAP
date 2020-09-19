@@ -10,7 +10,7 @@ import zio.{Chunk, IO}
 object ResponseService {
 
   def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
-    IO.fromEither((generateResponse _ andThen convertResponse) (msg))
+    IO((generateResponse _ andThen convertResponse) (msg))
 
   // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE! // TODO: do some logging for the error?
   private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[NoResponseAvailable, CoapMessage] =

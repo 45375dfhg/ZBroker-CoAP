@@ -20,3 +20,14 @@ final case class UnexpectedError(msg: String) extends GatewayError
 final case class SystemError(msg: String, cause: Throwable) extends GatewayError {
   override def fullMsg: String = super.fullMsg + cause
 }
+
+sealed trait CanFilter[+E] {
+  def apply(t: NoSuchElementException): E
+}
+
+object CanFilter {
+  implicit def canFilter[E >: NoSuchElementException]: CanFilter[E] =
+    new CanFilter[E] {
+      def apply(t: NoSuchElementException): E = t
+    }
+}
