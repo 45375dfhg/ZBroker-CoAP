@@ -19,13 +19,16 @@ object Program {
   // TODO: CHANGE ALL OF THIS LOL
   val start = ZStream.fromEffect(boot)
 
+  // TODO: REFACTOR
   val coapStream =
     ChunkStreamRepository
       .getChunkStream
       .mapM({ case (i, c) => UIO(i) <*> CoapDeserializerService.extractFromChunk(c).collect(ignore)(containsId) })
-      .tap(o => putStrLn(o._2.toString))
+      // .tap(o => putStrLn(o._2.toString))
       .tap( { case (i, c) =>
-        UIO.succeed(i) <*> ResponseService.getResponse(c) >>= (t => MessageSenderRepository.sendMessage(t._1, t._2))
+        (IO.fromOption(i).orElseFail(MissingAddress) <*>
+          ResponseService.getResponse(c) >>=
+          (t => MessageSenderRepository.sendMessage(t._1, t._2))).either
       })
       .tap(o => putStrLn(o._2.toString))
 
@@ -40,3 +43,14 @@ object Program {
 
   private val ignore = MissingCoapId // wrong - should be an actual unexpected kind of exception
 }
+
+/**
+val response = ResponseService.getResponse(c)
+        val address  = i.toRight(MissingAddress)
+        val cool = for {
+          r <- response
+          a <- address
+        } yield (a, r)
+        IO.fromEither(cool).flatMap({ case (fuck, me) => MessageSenderRepository.sendMessage(fuck, me)}).either
+
+*/

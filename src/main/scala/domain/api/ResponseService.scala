@@ -3,17 +3,16 @@ package domain.api
 import domain.api.CoapDeserializerService.IgnoredMessageWithId
 import domain.model.coap.header._
 import domain.model.coap._
-import domain.model.exception.NoResponseAvailable
-import domain.model.exception.NoResponseAvailable.NoResponseAvailable
+import domain.model.exception.{NoResponseAvailable, SuccessfulFailure}
 import zio.{Chunk, IO}
 
 object ResponseService {
 
   def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
-    IO((generateResponse _ andThen convertResponse) (msg))
+    IO.fromEither(generateResponse(msg).map(a => CoapSerializerService.generateFromMessage(a)))
 
   // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE! // TODO: do some logging for the error?
-  private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[NoResponseAvailable, CoapMessage] =
+  private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[SuccessfulFailure, CoapMessage] =
     msg match {
       case Right(message) if message.isConfirmable => Right(acknowledgeMessage(message.header.msgID))
       case Left((_, id))                           => Right(resetMessage(id))
@@ -27,8 +26,8 @@ object ResponseService {
       case _                                       => false
     }
 
-  private def convertResponse(msg: Either[NoResponseAvailable, CoapMessage]): Either[NoResponseAvailable, Chunk[Byte]] =
-    msg.map(CoapSerializerService.generateFromMessage)
+//  private def convertResponse(msg: CoapMessage): Either[SuccessfulFailure, Chunk[Byte]] =
+//    CoapSerializerService.generateFromMessage(msg)
 
   private def resetMessage(id: CoapId): CoapMessage =
     CoapMessage.reset(id)
