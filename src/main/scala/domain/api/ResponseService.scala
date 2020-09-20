@@ -11,6 +11,9 @@ object ResponseService {
   def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
     IO.fromEither(generateResponse(msg).map(a => CoapSerializerService.generateFromMessage(a)))
 
+  def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
+    CoapSerializerService.generateFromMessage(resetMessage(msg._2))
+
   // TODO: NEED TO PIGGYBACK THE ACTUAL RESPONSE! // TODO: do some logging for the error?
   private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[SuccessfulFailure, CoapMessage] =
     msg match {
