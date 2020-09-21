@@ -13,7 +13,7 @@ object Main extends App {
     (ChunkStreamRepositoryEnvironment.fromSocket ++ MessageSenderRepositoryEnvironment.fromSocket)
 
   def run(args: List[String]): URIO[ZEnv with Console, ExitCode] =
-    logic.tap(l => putStrLn(l.toString)).provideCustomLayer(partialLayer).orDie.exitCode
+    logic.provideCustomLayer(partialLayer).orDie.exitCode
 
 }
 

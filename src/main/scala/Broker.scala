@@ -1,9 +1,7 @@
 
-import zio.{Has, ZIO}
-import zio.console.putStrLn
+import domain.model.coap.option.CoapOptionValueContent
+import zio.{Chunk, NonEmptyChunk, UIO, ZIO}
 import zio.stm._
-
-import scala.collection.immutable.HashMap
 
 /**
  * There need to be two structures:
@@ -18,18 +16,53 @@ import scala.collection.immutable.HashMap
  */
 object Broker {
 
-  sealed trait Trie[+A, +B]
-  sealed trait Empty extends Trie[Nothing, Nothing]
-  case object Empty extends Empty
+  val subscriptions = TMap.empty[String, Set[String]]
 
-  final case class Node[A, B](subscriber: Set[B], children: Map[A, Trie[A, B]]) extends Trie[A, B]
+  def addTopic(routes: NonEmptyChunk[String]): UIO[Unit] = {
+    val nodes = routes.scan("")((acc, c) => acc + c).drop(1).map(_ -> Set[String]())
+    (for {
+      map <- subscriptions
+      arr <- TArray.fromIterable(nodes)
+      _   <- arr.foreach(n => map.merge(n._1, n._2)(_ union _).ignore)
+    } yield ()).commit
+  }
 
-  val subscriptions = TMap.empty[String, Node[String, Int]] // replace string with a ROUTE type
-
+  def addSubscriber(route: String, id: String): UIO[Unit] = {
+    (for {
+      o <- subscriptions
+      _ <- o.merge(route, Set(id))(_ union _)
+    } yield ()).commit
+  }
 
 
 }
 
+
+//  sealed trait Trie[+A, +B]
+//  sealed trait Empty extends Trie[Nothing, Nothing]
+//  case object Empty extends Empty
+//
+//  final case class Node[A, B](subscriber: Set[B], children: Map[A, Trie[A, B]]) extends Trie[A, B]
+//
+//  val subscriptions = TMap.empty[String, (Set[String], Node[String, Int])] // just an example
+//
+//  def addPublisher() = ???
+//
+//  def addSubscriber() = ???
+//
+//  def publish(routes: NonEmptyChunk[String]) = {
+//
+//    def loop(rem: Chunk[String]) =
+//      rem.headOption match {
+//        case Some(key) => (key -> Node(Set[String](), Map(loop))
+//        case None       => Empty
+//      }
+//
+//    for {
+//      subs <- subscriptions
+//      _    <- if subs.contains(routes.head)
+//    } yield ()
+//  }
 
 
 //val a: Node[String, String] = Node(Set("a", "b"), HashMap.empty)

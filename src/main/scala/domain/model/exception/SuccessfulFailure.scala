@@ -15,3 +15,11 @@ case object MissingCoapId extends SuccessfulFailure {
 case object MissingAddress extends SuccessfulFailure {
   override def msg = "No socket address was provided."
 }
+
+case object MissingOptions extends SuccessfulFailure {
+  override def msg = "The message does not contain any options."
+}
+
+case object MissingRoutes extends SuccessfulFailure {
+  override def msg = "The message does not contain any options with an Uri-Path."
+}
