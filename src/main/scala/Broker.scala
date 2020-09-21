@@ -23,7 +23,7 @@ object Broker {
     (for {
       map <- subscriptions
       arr <- TArray.fromIterable(nodes)
-      _   <- arr.foreach(n => map.merge(n._1, n._2)(_ union _).ignore)
+      _   <- arr.foreach(t => map.merge(t._1, t._2)(_ union _).ignore)
     } yield ()).commit
   }
 
@@ -34,6 +34,15 @@ object Broker {
     } yield ()).commit
   }
 
+  def getSubscribers(routes: NonEmptyChunk[String]): UIO[Set[String]] = {
+    (for {
+      map <- subscriptions
+      arr <- TArray.fromIterable(routes.scan("")((acc, c) => acc + c).drop(1))
+      tmp <- TMap.empty[String, Set[String]]
+      _   <- arr.foreach(k => map.getOrElse(k, Set[String]()).flatMap(set => tmp.merge(k, set)(_ union _).ignore))
+      res <- tmp.values
+    } yield res.foldRight(Set.empty[String])(_ union _)).commit
+  }
 
 }
 
