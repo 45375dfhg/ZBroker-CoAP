@@ -3,6 +3,8 @@ package domain.model.exception
 abstract class SuccessfulFailure extends GatewayError
 
 case object NoResponseAvailable extends SuccessfulFailure {
+  type NoResponseAvailable = NoResponseAvailable.type
+
   override def msg = "This message does not require a response"
 }
 
@@ -11,5 +13,5 @@ case object MissingCoapId extends SuccessfulFailure {
 }
 
 case object MissingAddress extends SuccessfulFailure {
-  override def msg = ""
+  override def msg = "No socket address was provided."
 }

@@ -8,8 +8,12 @@ import zio.{Chunk, IO}
 
 object ResponseService {
 
-  def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
-    IO.fromEither(generateResponse(msg).map(a => CoapSerializerService.generateFromMessage(a)))
+//  def getResponse(msg: Either[IgnoredMessageWithId, CoapMessage]) =
+//    IO.fromEither(generateResponse(msg).map(a => CoapSerializerService.generateFromMessage(a)))
+
+  def getResponse(msg: CoapMessage) =
+    CoapSerializerService.generateFromMessage(acknowledgeMessage(msg.header.msgID))
+
 
   def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
     CoapSerializerService.generateFromMessage(resetMessage(msg._2))
