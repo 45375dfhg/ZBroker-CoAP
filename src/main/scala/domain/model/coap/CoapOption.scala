@@ -187,7 +187,7 @@ package object option {
 
   object StringCoapOptionValueContent {
     def apply(raw: Chunk[Byte], range: Range): CoapOptionValueContent =
-      if (range contains raw.size) new StringCoapOptionValueContent(raw.map(_.toChar).mkString)
+      if (range contains raw.size) new StringCoapOptionValueContent(new String(raw.toArray, "UTF-8"))
       else UnrecognizedValueContent
   }
 

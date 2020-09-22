@@ -1,14 +1,13 @@
 package domain.api
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import domain.model.coap._
 import domain.model.coap.header._
 import domain.model.coap.option._
-
 import utility.Extractor
 import utility.Extractor._
-
 import zio.Chunk
 
 /**
@@ -102,7 +101,7 @@ object CoapSerializerService {
    */
   private def getOptionValueFrom(v: CoapOptionValue): Chunk[Byte] = v.content match {
     case c : IntCoapOptionValueContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
-    case c : StringCoapOptionValueContent  => Chunk.fromArray(c.value.map(_.toByte).toArray)
+    case c : StringCoapOptionValueContent  => Chunk.fromArray(c.value.getBytes(StandardCharsets.UTF_8))
     case c : OpaqueCoapOptionValueContent  => c.value
     case EmptyCoapOptionValueContent       => Chunk.empty
     case UnrecognizedValueContent          => Chunk.empty

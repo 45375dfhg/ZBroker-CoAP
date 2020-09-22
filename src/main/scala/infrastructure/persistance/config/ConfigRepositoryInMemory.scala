@@ -8,7 +8,7 @@ import zio._
 object ConfigRepositoryInMemory extends ConfigRepository.Service {
 
   // TODO: Configure proper fallbacks
-  override def getPrimaryUDPPort: IO[PortRangeException, Port] = Port(7021)
+  override def getPrimaryUDPPort: IO[PortRangeException, Port] = Port(7020)
 
   override def getInwardBufferSize: IO[BufferSizeException, BufferSize] = BufferSize(100)
 

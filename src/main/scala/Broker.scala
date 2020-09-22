@@ -16,32 +16,43 @@ import zio.stm._
  */
 object Broker {
 
-  val subscriptions = TMap.empty[String, Set[String]]
+  private val subscriptions = TMap.empty[String, Set[String]]
 
   def addTopic(routes: NonEmptyChunk[String]): UIO[Unit] = {
-    val nodes = routes.scan("")((acc, c) => acc + c).drop(1).map(_ -> Set[String]())
     (for {
       map <- subscriptions
-      arr <- TArray.fromIterable(nodes)
-      _   <- arr.foreach(t => map.merge(t._1, t._2)(_ union _).ignore)
+      arr <- TArray.fromIterable(routes.scan("")((acc, c) => acc + c).drop(1).map(_ -> Set[String]()))
+      _   <- arr.foreach(t => STM.succeed(map.merge(t._1, t._2)(_ union _)))
     } yield ()).commit
   }
 
-  def addSubscriber(route: String, id: String): UIO[Unit] = {
-    (for {
-      o <- subscriptions
-      _ <- o.merge(route, Set(id))(_ union _)
-    } yield ()).commit
-  }
+  /**
+   *
+   * @param route the route where to add a new subscriber
+   * @param id
+   * @return the set of subscribers on that specific route
+   */
+  def addSubscriber(route: String, id: String): UIO[Set[String]] =
+    subscriptions.flatMap(_.merge(route, Set(id))(_ union _)).commit
 
   def getSubscribers(routes: NonEmptyChunk[String]): UIO[Set[String]] = {
-    (for {
-      map <- subscriptions
-      arr <- TArray.fromIterable(routes.scan("")((acc, c) => acc + c).drop(1))
-      tmp <- TMap.empty[String, Set[String]]
-      _   <- arr.foreach(k => map.getOrElse(k, Set[String]()).flatMap(set => tmp.merge(k, set)(_ union _).ignore))
-      res <- tmp.values
-    } yield res.foldRight(Set.empty[String])(_ union _)).commit
+    val keys = routes.scan("")((acc, c) => acc + c).drop(1)
+    STM.atomically {
+      for {
+        subs <- subscriptions
+        sets <- STM.foreach(keys)(key => subs.getOrElse(key, Set.empty[String]))
+      } yield sets.fold(Set.empty[String])(_ union _)
+    }
+  }
+
+  def onIncomingMessage(routes: NonEmptyChunk[String]): UIO[Set[String]] = {
+    val keys = routes.scanLeft("")((acc, c) => acc + c).drop(1)
+    STM.atomically {
+      for {
+        subs <- subscriptions
+        sets <- STM.foreach(keys)(key => subs.merge(key, Set[String]())(_ union _))
+      } yield sets.fold(Set.empty[String])(_ union _)
+    }
   }
 
 }
