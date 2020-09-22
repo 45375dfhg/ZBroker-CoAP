@@ -19,7 +19,6 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
         }.collect {
           case StringCoapOptionValueContent(value) => value
         }.map(s => Route(s))
-
         NonEmptyChunk.fromChunk(routes).toRight(MissingRoutes)
       case None => Left(MissingOptions)
     }
