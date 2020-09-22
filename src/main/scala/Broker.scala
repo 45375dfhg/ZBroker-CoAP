@@ -1,16 +1,17 @@
 
+import domain.model.RouteModel.Route
 import zio.{Chunk, IO, NonEmptyChunk, UIO}
 import zio.stm._
 
 object Broker {
 
-  private val subscriptions = TMap.empty[String, Set[String]]
+  private val subscriptions = TMap.empty[Route, Set[String]]
 
   /**
    * Constructs entries for the route and its sub-routes
    * @param route a split representation of the uri-path
    */
-  def addTopic(route: NonEmptyChunk[String]): UIO[Unit] =
+  def addTopic(route: NonEmptyChunk[Route]): UIO[Unit] =
     (getSubRoutes _ andThen writeTopic)(route)
 
   /**
@@ -19,7 +20,7 @@ object Broker {
    * @param route a split representation of the uri-path
    * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
    */
-  def getSubscribersAndAddTopics(route: NonEmptyChunk[String]): UIO[Set[String]] =
+  def getSubscribersAndAddTopics(route: NonEmptyChunk[Route]): UIO[Set[String]] =
     (getSubRoutes _ andThen readSubscribersAndWriteTopics)(route)
 
   /**
@@ -28,7 +29,7 @@ object Broker {
    * @param route a split representation of the uri-path
    * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
    */
-  def getSubscribers(route: NonEmptyChunk[String]): UIO[Set[String]] =
+  def getSubscribers(route: NonEmptyChunk[Route]): UIO[Set[String]] =
     (getSubRoutes _ andThen readSubscribers)(route)
 
   /**
@@ -37,13 +38,13 @@ object Broker {
    * @param id the id of the subscriber, used as a key for the hashmap
    * @return The newly merged set of subscribers for the given ID
    */
-  def addSubscriber(route: NonEmptyChunk[String], id: String): UIO[Set[String]] = {
+  def addSubscriber(route: NonEmptyChunk[Route], id: String): UIO[Set[String]] = {
     val key = buildRoute(route)
     subscriptions.flatMap(_.merge(key, Set(id))(_ union _)).commit
   }
 
-  private val writeTopic: Chunk[String] => IO[Nothing, Unit] =
-    (keys: Chunk[String]) =>
+  private val writeTopic: Chunk[Route] => UIO[Unit] =
+    (keys: Chunk[Route]) =>
       STM.atomically {
         for {
           map <- subscriptions
@@ -51,8 +52,8 @@ object Broker {
         } yield ()
       }
 
-  private val readSubscribers: Chunk[String] => UIO[Set[String]] =
-    (keys: Chunk[String]) =>
+  private val readSubscribers: Chunk[Route] => UIO[Set[String]] =
+    (keys: Chunk[Route]) =>
       STM.atomically {
         for {
           subs <- subscriptions
@@ -60,8 +61,8 @@ object Broker {
         } yield sets.fold(Set.empty[String])(_ union _)
       }
 
-  private val readSubscribersAndWriteTopics: Chunk[String] => UIO[Set[String]] =
-    (keys: Chunk[String]) =>
+  private val readSubscribersAndWriteTopics: Chunk[Route] => UIO[Set[String]] =
+    (keys: Chunk[Route]) =>
       STM.atomically {
         for {
           subs <- subscriptions
@@ -69,9 +70,9 @@ object Broker {
         } yield sets.fold(Set.empty[String])(_ union _)
       }
 
-  private def getSubRoutes(route: NonEmptyChunk[String]): Chunk[String] =
-    route.scan("")((acc, c) => acc + c).drop(1)
+  private def getSubRoutes(route: NonEmptyChunk[Route]): Chunk[Route] =
+    route.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
 
-  private def buildRoute(route: NonEmptyChunk[String]): String =
-    route.mkString
+  private def buildRoute(route: NonEmptyChunk[Route]): Route =
+    Route(route.mkString)
 }

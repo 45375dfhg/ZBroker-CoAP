@@ -1,9 +1,9 @@
 package domain.model.coap
 
+import domain.model.RouteModel.Route
 import domain.model.coap.header.CoapId
 import domain.model.coap.option.StringCoapOptionValueContent
 import domain.model.exception.{MissingOptions, MissingRoutes, SuccessfulFailure}
-
 import zio.NonEmptyChunk
 
 final case class CoapMessage(header: CoapHeader, body: CoapBody) {
@@ -11,12 +11,15 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   def isConfirmable: Boolean    = this.header.msgType.value == 0
   def isNonConfirmable: Boolean = this.header.msgType.value == 1
 
-  def getRoutes: Either[SuccessfulFailure, NonEmptyChunk[String]] = {
+  def getRoutes: Either[SuccessfulFailure, NonEmptyChunk[Route]] = {
     this.body.options match {
       case Some(optionChunk) =>
         val routes = optionChunk.collect {
           case option if option.number.value == 11 => option.optValue.content
-        } collect { case StringCoapOptionValueContent(value) => value }
+        }.collect {
+          case StringCoapOptionValueContent(value) => value
+        }.map(s => Route(s))
+
         NonEmptyChunk.fromChunk(routes).toRight(MissingRoutes)
       case None => Left(MissingOptions)
     }
