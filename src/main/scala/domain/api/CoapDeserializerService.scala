@@ -26,14 +26,14 @@ object CoapDeserializerService {
    * Error handling is done via short-circuiting since a malformed packet would throw
    * too many and mostly useless errors. Thus, a top-down error search is implemented.
    */
-  /*_*/ // IntelliJ Highlighting is broken for the return type
+
   def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[IgnoredMessageWithIdOption, CoapMessage]] =
     (for {
       header  <- chunk.takeExactly(4) >>= headerFromChunk
       body    <- chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
       message <- validateMessage(header, body)
     } yield message).flatMapError(err => URIO(err) <*> getMsgIdFromMessage(chunk)).either
-  /*_*/
+
   /**
    * Attempts to form a CoapHeader when handed a Chunk of size 4.
    * Might fail with header parameter dependent errors.

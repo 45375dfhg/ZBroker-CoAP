@@ -32,6 +32,7 @@ object Program {
       .collect(validMessage)
       .tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage)
+      .tap(a => putStrLn(a.toString))
 
   private def sendAcknowledgment(tuple: (Option[SocketAddress], CoapMessage)) = {
     tuple match {

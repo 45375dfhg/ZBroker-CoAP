@@ -1,15 +1,17 @@
 package domain.model.coap
 
 import domain.model.coap.header.CoapId
-import domain.model.coap.option.{CoapOptionValueContent, StringCoapOptionValueContent}
+import domain.model.coap.option.StringCoapOptionValueContent
 import domain.model.exception.{MissingOptions, MissingRoutes, SuccessfulFailure}
-import zio.{Chunk, NonEmptyChunk}
+
+import zio.NonEmptyChunk
 
 final case class CoapMessage(header: CoapHeader, body: CoapBody) {
+
   def isConfirmable: Boolean    = this.header.msgType.value == 0
   def isNonConfirmable: Boolean = this.header.msgType.value == 1
 
-  def getRoutes: Either[SuccessfulFailure, NonEmptyChunk[String]] =
+  def getRoutes: Either[SuccessfulFailure, NonEmptyChunk[String]] = {
     this.body.options match {
       case Some(optionChunk) =>
         val routes = optionChunk.collect {
@@ -18,11 +20,13 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
         NonEmptyChunk.fromChunk(routes).toRight(MissingRoutes)
       case None => Left(MissingOptions)
     }
+  }
+
 }
 
 object CoapMessage {
   def reset(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
-  def ack(id   : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
+  def ack  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
 }
 
 

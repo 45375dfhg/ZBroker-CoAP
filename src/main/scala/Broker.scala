@@ -1,107 +1,77 @@
 
-import domain.model.coap.option.CoapOptionValueContent
-import zio.{Chunk, NonEmptyChunk, UIO, ZIO}
+import zio.{Chunk, IO, NonEmptyChunk, UIO}
 import zio.stm._
 
-/**
- * There need to be two structures:
- * 1. Every route has zero or more subscribers
- * 2. Every route is mapped to a device's IP
- * -> separated to avoid overhead due to copying
- *
- * A subscriber IS its own address / the related connection
- *
- * Note: Subscriber should NOT know about IPs
- * Question: What if two devices provide information to the same route? List?
- */
 object Broker {
 
   private val subscriptions = TMap.empty[String, Set[String]]
 
-  def addTopic(routes: NonEmptyChunk[String]): UIO[Unit] = {
-    (for {
-      map <- subscriptions
-      arr <- TArray.fromIterable(routes.scan("")((acc, c) => acc + c).drop(1).map(_ -> Set[String]()))
-      _   <- arr.foreach(t => STM.succeed(map.merge(t._1, t._2)(_ union _)))
-    } yield ()).commit
-  }
+  /**
+   * Constructs entries for the route and its sub-routes
+   * @param route a split representation of the uri-path
+   */
+  def addTopic(route: NonEmptyChunk[String]): UIO[Unit] =
+    (getSubRoutes _ andThen writeTopic)(route)
 
   /**
-   *
-   * @param route the route where to add a new subscriber
-   * @param id
-   * @return the set of subscribers on that specific route
+   * Recursively collects all subscribers for a given route and its sub-routes recursively while also constructing
+   * topics for the route and its sub-routes if not already existent
+   * @param route a split representation of the uri-path
+   * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
    */
-  def addSubscriber(route: String, id: String): UIO[Set[String]] =
-    subscriptions.flatMap(_.merge(route, Set(id))(_ union _)).commit
+  def getSubscribersAndAddTopics(route: NonEmptyChunk[String]): UIO[Set[String]] =
+    (getSubRoutes _ andThen readSubscribersAndWriteTopics)(route)
 
-  def getSubscribers(routes: NonEmptyChunk[String]): UIO[Set[String]] = {
-    val keys = routes.scan("")((acc, c) => acc + c).drop(1)
-    STM.atomically {
-      for {
-        subs <- subscriptions
-        sets <- STM.foreach(keys)(key => subs.getOrElse(key, Set.empty[String]))
-      } yield sets.fold(Set.empty[String])(_ union _)
-    }
+  /**
+   * Gets all subscribers recursively for a given route which means that sub-routes and their respective
+   * subscribers are included in the result set.
+   * @param route a split representation of the uri-path
+   * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
+   */
+  def getSubscribers(route: NonEmptyChunk[String]): UIO[Set[String]] =
+    (getSubRoutes _ andThen readSubscribers)(route)
+
+  /**
+   * Writes a single subscriber to the given key
+   * @param route a split representation of the uri-path
+   * @param id the id of the subscriber, used as a key for the hashmap
+   * @return The newly merged set of subscribers for the given ID
+   */
+  def addSubscriber(route: NonEmptyChunk[String], id: String): UIO[Set[String]] = {
+    val key = buildRoute(route)
+    subscriptions.flatMap(_.merge(key, Set(id))(_ union _)).commit
   }
 
-  def onIncomingMessage(routes: NonEmptyChunk[String]): UIO[Set[String]] = {
-    val keys = routes.scanLeft("")((acc, c) => acc + c).drop(1)
-    STM.atomically {
-      for {
-        subs <- subscriptions
-        sets <- STM.foreach(keys)(key => subs.merge(key, Set[String]())(_ union _))
-      } yield sets.fold(Set.empty[String])(_ union _)
-    }
-  }
+  private val writeTopic: Chunk[String] => IO[Nothing, Unit] =
+    (keys: Chunk[String]) =>
+      STM.atomically {
+        for {
+          map <- subscriptions
+          _   <- STM.foreach_(keys)(key => STM.succeed(map.merge(key, Set.empty[String])(_ union _)))
+        } yield ()
+      }
 
+  private val readSubscribers: Chunk[String] => UIO[Set[String]] =
+    (keys: Chunk[String]) =>
+      STM.atomically {
+        for {
+          subs <- subscriptions
+          sets <- STM.foreach(keys)(key => subs.getOrElse(key, Set.empty[String]))
+        } yield sets.fold(Set.empty[String])(_ union _)
+      }
+
+  private val readSubscribersAndWriteTopics: Chunk[String] => UIO[Set[String]] =
+    (keys: Chunk[String]) =>
+      STM.atomically {
+        for {
+          subs <- subscriptions
+          sets <- STM.foreach(keys)(key => subs.merge(key, Set[String]())(_ union _))
+        } yield sets.fold(Set.empty[String])(_ union _)
+      }
+
+  private def getSubRoutes(route: NonEmptyChunk[String]): Chunk[String] =
+    route.scan("")((acc, c) => acc + c).drop(1)
+
+  private def buildRoute(route: NonEmptyChunk[String]): String =
+    route.mkString
 }
-
-
-//  sealed trait Trie[+A, +B]
-//  sealed trait Empty extends Trie[Nothing, Nothing]
-//  case object Empty extends Empty
-//
-//  final case class Node[A, B](subscriber: Set[B], children: Map[A, Trie[A, B]]) extends Trie[A, B]
-//
-//  val subscriptions = TMap.empty[String, (Set[String], Node[String, Int])] // just an example
-//
-//  def addPublisher() = ???
-//
-//  def addSubscriber() = ???
-//
-//  def publish(routes: NonEmptyChunk[String]) = {
-//
-//    def loop(rem: Chunk[String]) =
-//      rem.headOption match {
-//        case Some(key) => (key -> Node(Set[String](), Map(loop))
-//        case None       => Empty
-//      }
-//
-//    for {
-//      subs <- subscriptions
-//      _    <- if subs.contains(routes.head)
-//    } yield ()
-//  }
-
-
-//val a: Node[String, String] = Node(Set("a", "b"), HashMap.empty)
-//val b: Node[String, String] = Node(Set("c"), HashMap("room1" -> a))
-//
-//val c = (for {
-//  set <- TMap.make("home1" -> b)
-//} yield set).commit
-//
-//
-//
-//
-//def fn(map: TMap[String, Node[String, String]]) =
-//  (for {
-//    a <- map.merge("home1", Node(Set("d"), HashMap.empty))((one, two) => one.copy(subscriber = one.subscriber union two.subscriber))
-//  } yield a).commit
-//
-//
-//val d = c.tap(fn).flatMap(_.get("home1").commit).flatMap({
-//  case Some(node) => ZIO.succeed(node.subscriber)
-//  case None       => ZIO.fail("")
-//}).tap(a => ZIO.foreach(a)(putStrLn))
