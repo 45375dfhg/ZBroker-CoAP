@@ -1,6 +1,6 @@
 
 import domain.model.RouteModel.Route
-import zio.{Chunk, NonEmptyChunk, UIO, ZIO}
+import zio.{Chunk, IO, NonEmptyChunk, UIO, ZIO}
 import zio.stm._
 
 
@@ -37,25 +37,39 @@ object Broker {
    * Writes a single subscriber to the given key
    * @param uriRoute a split representation of the uri-path
    * @param id the id of the subscriber, used as a key for the hashmap
-   * @return The newly merged set of subscribers for the given ID
+   * @return The success of adding the subscriber as Boolean - success is mapped to true and vice versa
    */
-  def addSubscriber(uriRoute: NonEmptyChunk[Route], id: String): UIO[Set[String]] = {
+  def addSubscriber(uriRoute: NonEmptyChunk[Route], id: String): UIO[Boolean] = {
     val key = buildRoute(uriRoute)
-    subscriptions.flatMap(_.merge(key, Set(id))(_ union _)).commit
+    STM.atomically {
+      for {
+        subs <- subscriptions
+        bool <- subs.get(key).flatMap(STM.fromOption).map(_.contains(id)).fold(_ => false, identity)
+        _    <- STM.unless(bool)(subs.merge(key, Set(id))(_ union _))
+      } yield bool
+    }
   }
 
   /**
    * Deletes a single subscriber from the value set of the given key (route). The removal is not applied to sub-routes.
    * @param uriRoute a split representation of the uri-path
    * @param id the id of the subscriber, used as a key for the hashmap
+   * @return A Boolean that reflects whether the deletion was successful or not.
    */
-  def deleteSubscriberFrom(uriRoute: NonEmptyChunk[Route], id: String): UIO[Unit] = {
+  def deleteSubscriberFrom(uriRoute: NonEmptyChunk[Route], id: String): UIO[Boolean] = {
     val key = buildRoute(uriRoute)
-    subscriptions.flatMap(subs => STM.whenM(subs.contains(key))(subs.merge(key, Set(id))(_ diff _))).commit
+    STM.atomically {
+      for {
+        subs <- subscriptions
+        bool <- subs.contains(key)
+        _ <- STM.when(bool)(subs.merge(key, Set(id))(_ diff _))
+      } yield bool
+    }
   }
 
   val getAllTopics: UIO[List[Route]] =
     subscriptions.flatMap(_.keys).commit
+
 
   private val writeTopic: Chunk[Route] => UIO[Unit] =
     (keys: Chunk[Route]) =>
