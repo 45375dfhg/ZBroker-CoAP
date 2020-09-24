@@ -2,11 +2,15 @@
 import domain.model.RouteModel.Route
 import zio.{Chunk, IO, NonEmptyChunk, UIO, ZIO}
 import zio.stm._
+import zio.Queue
 
 
 object Broker {
 
   private val subscriptions = TMap.empty[Route, Set[String]]
+
+  // TODO: Setup a second map and implement a proper subscription id
+  private val queues = TMap.empty[String, Queue[String]]
 
   /**
    * Constructs entries for the route and its sub-routes
@@ -62,14 +66,13 @@ object Broker {
       for {
         subs <- subscriptions
         bool <- subs.contains(key)
-        _ <- STM.when(bool)(subs.merge(key, Set(id))(_ diff _))
+        _    <- STM.when(bool)(subs.merge(key, Set(id))(_ diff _))
       } yield bool
     }
   }
 
   val getAllTopics: UIO[List[Route]] =
     subscriptions.flatMap(_.keys).commit
-
 
   private val writeTopic: Chunk[Route] => UIO[Unit] =
     (keys: Chunk[Route]) =>

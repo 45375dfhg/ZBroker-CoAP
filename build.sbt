@@ -6,12 +6,22 @@ version := "0.1"
 
 run / fork := true
 
+PB.targets in Compile := Seq(
+    scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "scalapb",
+    scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value / "scalapb"
+)
+
 libraryDependencies ++= Seq(
+    // ZIO
     "dev.zio" %% "zio" % "1.0.1",
     "dev.zio" %% "zio-streams" % "1.0.1",
     "dev.zio" %% "zio-nio" % "1.0.0-RC9",
     "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
-    "io.estatico" %% "newtype" % "0.4.4"
+    // NEWTYPE
+    "io.estatico" %% "newtype" % "0.4.4",
+    // ZIO GRPC
+    "io.grpc" % "grpc-netty" % "1.31.1",
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 )
 
 scalacOptions ++= Seq(
