@@ -53,7 +53,7 @@ object Program {
         case Left(value) =>
           val msg = ResponseService.getResetMessage(value)
           IO.fromOption(address).orElseFail(MissingAddress).flatMap(sendMessage(_, msg)).either
-        case Right(_) => UIO.unit
+        case Right(_)    => UIO.unit
       }
     }
 
@@ -73,66 +73,3 @@ object Program {
     (Option[SocketAddress], Either[IgnoredMessageWithId, CoapMessage])]
 
 }
-
-//      .collect { case (address, either) => either match {
-//        case Right(value) => (address, value)
-//      }}
-
-//  { case (address, either) => either match {
-//    case Left(value) => {
-//      val msg = ResponseService.getResetMessage(value)
-//      IO.fromOption(address).orElseFail(MissingAddress).flatMap(MessageSenderRepository.sendMessage(_, msg)).either
-//    }
-//    case Right(_) => UIO.succeed("Nothing to do.")
-//  }}
-
-//      .broadcast(2, 16)
-//      .flatMap { case a :: b :: Nil =>
-//        val lefts  = a.collect { case (address, either) => either match { case Left(value) => (address, value) } }
-//        val rights = b.map(_._2)
-//      }
-
-
-//      .groupByKey(_._2.isRight) {
-//        case (true, stream) => stream.mapM({ case (i, o) => IO(i) <*> IO.fromEither(o). })
-//        case (false, stream) => stream.mapM(
-//          { case (i, c) =>
-//            (IO.fromOption(i).orElseFail(MissingAddress) <*>
-//              IO.fromEither(c.swap).bimap(_ => UnexpectedError("critical"), id => ResponseService.getResetMessage(id)))
-//              .flatMap(t => MessageSenderRepository.sendMessage(t._1, t._2)).
-//          })
-//        }.filter(a => )
-//      .flatMap()
-
-
-// (IO.fromOption(i).orElseFail(MissingAddress) <*>
-//      .tap(o => putStrLn(o._2.toString))
-//      .tap( { case (i, c) =>
-//        (IO.fromOption(i).orElseFail(MissingAddress) <*>
-//          ResponseService.getResponse(c) >>=
-//          (t => MessageSenderRepository.sendMessage(t._1, t._2))).either
-//      })
-//      .tap(o => putStrLn(o._2.toString))
-
-// .partition(o => ResponseService.hasResponse(o._2), 2048)
-
-/* 1. (address, chunk) =>
-   2. if (failed) sendMessage else {
-       check code code and match the requested action (basically only allow get and put for now)
-      } then send response if necessary
-   3. if correct code was sent (put)
-
-
- */
-
-//  private def errorContainsID: PartialRemoveEmptyID = {
-//    case (address, either) => either match {
-//      case Right(m)                        => (address, Right(m))
-//      case Left((err, id)) if id.isDefined => (address, Left(err, id.get))
-//      case _ =>
-//    }}
-
-//  private def containsId: PartialFunction[Either[IgnoredMessageWithIdOption, CoapMessage], Either[IgnoredMessageWithId, CoapMessage]] = {
-//    case Right(m)                          => Right(m)
-//    case Left((err, opt)) if opt.isDefined => Left(err, opt.get) // this is not very idiomatic since it's using .get!
-//  }

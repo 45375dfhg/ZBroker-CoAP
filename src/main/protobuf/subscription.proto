@@ -1,31 +1,56 @@
 syntax = "proto3";
 
-package rpc;
+package subgrpc;
 
 service SubscriptionService {
-
+  rpc Subscribe(SubscriptionRequest) returns (stream PublisherResponse);
 }
 
-// A SingularSubscriptionRequest is a message sent to subscribe
-// to a single endpoint of a single sensor.
-//
-// Responses will not contain the requested endpoint.
-// If broker performance is critical this is not recommended,
-// see MultipleSubscriptionRequest instead.
-message SingularSubscriptionRequest {
-  message Route {
-    string root = 1;
-    repeated string subpath = 2;
-  }
-  Route subscription = 1;
+/* A SubscriptionRequest is a message sent to subscribe
+ * to one or many endpoints of one or many sensors.
+ *
+ * The id field is an id that the server had provided to
+ * the client on a previous exchange and should be used
+ * to minimize performance overhead on the broker.
+ *
+ * If broker performance is critical it is recommended
+ * to re-use the provided ID on new subscriptions as
+ * often as possible and if not possible to subscribe
+ * to multiple endpoints in a single request.
+ *
+ * The problem is NOT gRPC related but how subscriptions
+ * are bundled internally. */
+
+message SubscriptionRequest {
+  int64 id = 1;
+  repeated Path subscription = 2;
 }
 
-// A MultipleSubscriptionRequest is a message sent to subscribe
-// to multiple endpoints of possibly multiple sensors.
-//
-// Responses will contain their origin as in their endpoint.
-// Messages therefore need to be matched on the client-side.
-// For broker performance this is recommended.
-message MultipleSubscriptionRequest {
-  repeated SingularSubscription.Route subscriptions = 1;
+/* One of many possible responses to a request.
+ * It contains an identifier to match the response
+ * to a subscription, if necessary. The meat of
+ * response is a repeated string, usually one. */
+
+message PublisherResponse {
+  // An unique ID provided by the server to the client inside a response
+  int64 id = 1; // TODO: Maybe this is a oneof
+
+  // A reference to the "subscription" field
+  Path identifier = 2;
+
+  // The topic's newest content
+  repeated string content = 3;
 }
+
+/* A Path is equivalent to the path of an URI, yet does NOT contain slashes
+ * and its segments are separated strings.
+ * Since proto3 does NOT support required fields, the API has
+ * to filter this field. Empty paths and paths containing slashes will be rejected.
+ *
+ * THIS WOULD MATCH AGAINST A SUBSCRIPTION TO THE WHOLE BROKER WHICH IS NOT ALLOWED. */
+
+message Path {
+  repeated string segment = 1;
+}
+
+// TODO: A second proto file for logging services and direct access to the broker!
