@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package rpc;
+
+service SubscriptionService {
+
+}
+
+// A SingularSubscriptionRequest is a message sent to subscribe
+// to a single endpoint of a single sensor.
+//
+// Responses will not contain the requested endpoint.
+// If broker performance is critical this is not recommended,
+// see MultipleSubscriptionRequest instead.
+message SingularSubscriptionRequest {
+  message Route {
+    string root = 1;
+    repeated string subpath = 2;
+  }
+  Route subscription = 1;
+}
+
+// A MultipleSubscriptionRequest is a message sent to subscribe
+// to multiple endpoints of possibly multiple sensors.
+//
+// Responses will contain their origin as in their endpoint.
+// Messages therefore need to be matched on the client-side.
+// For broker performance this is recommended.
+message MultipleSubscriptionRequest {
+  repeated SingularSubscription.Route subscriptions = 1;
+}

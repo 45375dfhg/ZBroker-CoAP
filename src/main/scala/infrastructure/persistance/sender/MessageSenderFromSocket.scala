@@ -1,10 +1,7 @@
 package infrastructure.persistance.sender
 
-import java.io.IOException
-import java.net.InetSocketAddress
-
 import domain.model.chunkstream.ChunkStreamRepository.Channel
-import domain.model.exception.{GatewayError, MissingAddress, SuccessfulFailure}
+import domain.model.exception.GatewayError
 import domain.model.sender.MessageSenderRepository
 import zio._
 import zio.console.Console

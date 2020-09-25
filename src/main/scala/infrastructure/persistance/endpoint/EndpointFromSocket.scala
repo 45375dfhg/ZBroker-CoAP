@@ -2,9 +2,8 @@ package infrastructure.persistance.endpoint
 
 import domain.model.config.ConfigRepository
 import domain.model.config.ConfigRepository.ConfigRepository
-import java.io.IOException
 
-import domain.model.exception.{GatewayError, SystemError}
+import domain.model.exception.GatewayError
 import zio._
 import zio.nio.core.channels._
 import zio.nio.core._

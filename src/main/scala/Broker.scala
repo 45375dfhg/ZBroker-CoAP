@@ -1,6 +1,6 @@
 
 import domain.model.RouteModel.Route
-import zio.{Chunk, IO, NonEmptyChunk, UIO, ZIO}
+import zio.{Chunk, NonEmptyChunk, UIO}
 import zio.stm._
 import zio.Queue
 
@@ -10,7 +10,7 @@ object Broker {
   private val subscriptions = TMap.empty[Route, Set[String]]
 
   // TODO: Setup a second map and implement a proper subscription id
-  private val queues = TMap.empty[String, Queue[String]]
+  // private val queues = TMap.empty[String, Queue[String]]
 
   /**
    * Constructs entries for the route and its sub-routes
@@ -48,7 +48,7 @@ object Broker {
     STM.atomically {
       for {
         subs <- subscriptions
-        bool <- subs.get(key).flatMap(STM.fromOption).map(_.contains(id)).fold(_ => false, identity)
+        bool <- subs.get(key).flatMap(o => STM.fromOption(o)).map(_.contains(id)).fold(_ => false, identity)
         _    <- STM.unless(bool)(subs.merge(key, Set(id))(_ union _))
       } yield bool
     }

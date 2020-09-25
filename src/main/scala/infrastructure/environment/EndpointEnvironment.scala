@@ -4,7 +4,7 @@ import domain.model.chunkstream.ChunkStreamRepository.Channel
 import domain.model.config.ConfigRepository.ConfigRepository
 import domain.model.exception.GatewayError
 import infrastructure.persistance.endpoint.EndpointFromSocket
-import zio.{Has, UIO, ZLayer}
+import zio.{UIO, ZLayer}
 
 object EndpointEnvironment {
 

@@ -1,7 +1,7 @@
 package domain.model.sender
 
 import domain.model.chunkstream.ChunkStreamRepository.Channel
-import domain.model.exception.{GatewayError, SuccessfulFailure}
+import domain.model.exception.GatewayError
 import zio.console.Console
 import zio.{Chunk, Has, ZIO}
 import zio.nio.core.SocketAddress
