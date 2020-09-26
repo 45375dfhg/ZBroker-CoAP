@@ -12,20 +12,28 @@ object BrokerSTM extends BrokerRepository.Service {
 
   private val subscriptions = TMap.empty[Route, Set[Long]]
 
-  // TODO: Setup a second map and implement a proper subscription id
   private val buckets = TMap.empty[Long, TQueue[String]]
 
-  def addTopic(path: Path): UIO[Unit] =
-    (getSubRoutesFrom _ andThen writeTopic) (path)
+  private val uid = TRef.make(0L)
 
-  private val writeTopic: Seq[Route] => UIO[Unit] =
-    (keys: Seq[Route]) =>
-      STM.atomically {
+  val getId = uid.flatMap(_.updateAndGet(_ + 1)).commit
+
+  def pushMessageTo(route: NonEmptyChunk[Route], msg: String) = {
+    val routes = getSubRoutes(route)
+
+    for {
+      sMap <- subscriptions
+      set  <- STM.foreach(routes)(key => sMap.getOrElse(key, Set.empty[Long])).map(_.reduce(_ union _))
+      qMap <- buckets
+      _    <- STM.foreach_(set) { key =>
         for {
-          map <- subscriptions
-          _   <- STM.foreach_(keys)(key => map.putIfAbsent(key, Set.empty[Long]))
+          queueM <- qMap.get(key)
+          queue  <- queueM.fold(TQueue.unbounded[String])(STM.succeed(_))
+          _      <- queue.offer(msg)
         } yield ()
       }
+    } yield ()
+  }
 
   def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] = {
     val keys = topics.flatMap(getSubRoutesFrom)
@@ -40,15 +48,52 @@ object BrokerSTM extends BrokerRepository.Service {
     }
   }
 
+  def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] = {
+    val keys = topics.flatMap(getSubRoutesFrom)
 
+    STM.atomically {
+      for {
+        sMap <- subscriptions
+        _    <- STM.foreach_(keys) { key =>
+                  STM.whenM(sMap.get(key).map(_.fold(false)(_.contains(id)))) {
+                    sMap.merge(key, Set(id))(_ diff _)
+                  }
+                }
+      } yield ()
+    }
+  }
 
+  // TODO: Is this really necessary?
+  def addTopic(uriPath: NonEmptyChunk[Route]): UIO[Unit] =
+    (getSubRoutes _ andThen writeTopic)(uriPath)
+
+  private val writeTopic: Chunk[Route] => UIO[Unit] =
+    (keys: Chunk[Route]) =>
+      STM.atomically {
+        for {
+          sMap <- subscriptions
+          _    <- STM.foreach_(keys)(key => sMap.putIfAbsent(key, Set.empty[Long]))
+        } yield ()
+      }
+
+  // TODO: Refactor the functions below to one single FN
+  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
+    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
+
+  // For now handles the traffic coming from the grpc side
   private def getSubRoutesFrom(path: Path): Seq[Route] =
-    path.segments.scanLeft(Route(""))((acc, c) => Route(acc.asString + c))
+    path.segments.scanLeft(Route(""))((acc, c) => Route(acc.asString + c)).drop(1)
 
-  private def buildRoute(path: Path): Route =
-    Route(path.segments.mkString)
+  private def buildRoute(uriPath: NonEmptyChunk[Route]): Route =
+    Route(uriPath.mkString)
 
 }
+
+//  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
+//    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
+//
+//  private def buildRoute(uriRoute: NonEmptyChunk[Route]): Route =
+//    Route(uriRoute.mkString)
 
 
 //  /**

@@ -9,10 +9,10 @@ object BrokerRepository {
   type BrokerRepository = Has[BrokerRepository.Service]
 
   trait Service {
-    def addTopic(path: Path): UIO[Unit]
+    def addTopic(uriPath: NonEmptyChunk[Route]): UIO[Unit]
   }
 
-  def addTopic(path: Path): URIO[BrokerRepository, Unit] =
-    ZIO.accessM(_.get.addTopic(path))
+  def addTopic(uriPath: NonEmptyChunk[Route]): URIO[BrokerRepository, Unit] =
+    ZIO.accessM(_.get.addTopic(uriPath))
 
 }
