@@ -3,38 +3,29 @@ syntax = "proto3";
 package subgrpc;
 
 service SubscriptionService {
-  rpc Subscribe(SubscriptionRequest) returns (stream PublisherResponse);
+  rpc Subscribe(stream SubscriptionRequest) returns (stream PublisherResponse);
 }
 
-/* A SubscriptionRequest is a message sent to subscribe
+/* A SubscriptionRequest is a message sent to subscribe or unsubscribe
  * to one or many endpoints of one or many sensors.
  *
- * The id field is an id that the server had provided to
- * the client on a previous exchange and should be used
- * to minimize performance overhead on the broker.
- *
- * If broker performance is critical it is recommended
- * to re-use the provided ID on new subscriptions as
- * often as possible and if not possible to subscribe
- * to multiple endpoints in a single request.
- *
- * The problem is NOT gRPC related but how subscriptions
- * are bundled internally. */
+ * The action will be matched to either add or remove one or many subscriptions. */
 
 message SubscriptionRequest {
-  int64 id = 1;
-  repeated Path subscription = 2;
+  enum Action {
+    ADD = 0;
+    REMOVE = 1;
+  }
+  Action action = 1;
+  repeated Path subscriptions = 2;
 }
 
-/* One of many possible responses to a request.
+/* A response to a SubscriptionRequest.
  * It contains an identifier to match the response
  * to a subscription, if necessary. The meat of
  * response is a repeated string, usually one. */
 
 message PublisherResponse {
-  // An unique ID provided by the server to the client inside a response
-  int64 id = 1; // TODO: Maybe this is a oneof
-
   // A reference to the "subscription" field
   Path identifier = 2;
 
@@ -50,7 +41,5 @@ message PublisherResponse {
  * THIS WOULD MATCH AGAINST A SUBSCRIPTION TO THE WHOLE BROKER WHICH IS NOT ALLOWED. */
 
 message Path {
-  repeated string segment = 1;
+  repeated string segments = 1;
 }
-
-// TODO: A second proto file for logging services and direct access to the broker!
