@@ -1,6 +1,7 @@
 package domain.model.broker
 
 import domain.model.RouteModel.Route
+import subgrpc.subscription.Path
 import zio.{Has, NonEmptyChunk, UIO, URIO, ZIO}
 
 object BrokerRepository {
@@ -8,10 +9,10 @@ object BrokerRepository {
   type BrokerRepository = Has[BrokerRepository.Service]
 
   trait Service {
-    def addTopic(uriRoute: NonEmptyChunk[Route]): UIO[Unit]
+    def addTopic(path: Path): UIO[Unit]
   }
 
-  def addTopic(uriRoute: NonEmptyChunk[Route]): URIO[BrokerRepository, Unit] =
-    ZIO.accessM(_.get.addTopic(uriRoute))
+  def addTopic(path: Path): URIO[BrokerRepository, Unit] =
+    ZIO.accessM(_.get.addTopic(path))
 
 }
