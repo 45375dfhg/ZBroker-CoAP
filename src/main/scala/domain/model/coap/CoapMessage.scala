@@ -12,7 +12,7 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   def isConfirmable: Boolean    = this.header.msgType.value == 0
   def isNonConfirmable: Boolean = this.header.msgType.value == 1
 
-  val getRoute: IO[SuccessfulFailure, NonEmptyChunk[String]] = {
+  val getPath: IO[SuccessfulFailure, NonEmptyChunk[String]] = {
     this.body.options match {
       case Some(optionChunk) =>
         val routes = optionChunk.collect {
@@ -36,8 +36,7 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   }
 
   val toPublisherResponse: IO[SuccessfulFailure, PublisherResponse] =
-    (getRoute <*> getContent).map { case (route, content) => PublisherResponse(Some(Path(route.toSeq)), content) }
-
+    (getPath <*> getContent).map { case (route, content) => PublisherResponse(Some(Path(route.toSeq)), content) }
 
 }
 

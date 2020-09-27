@@ -3,22 +3,26 @@ package infrastructure.persistance.broker
 import domain.model.RouteModel._
 import domain.model.broker.BrokerRepository
 import domain.model.exception.{GatewayError, UnexpectedError}
-import subgrpc.subscription.Path
+import subgrpc.subscription.{Path, PublisherResponse}
 import zio.stm._
 import zio._
 
 object BrokerSTM extends BrokerRepository.Service {
 
-  private val subscriptions = TMap.empty[Route, Set[Long]]
+  private val subscriptions = TMap.empty[String, Set[Long]]
 
-  private val buckets = TMap.empty[Long, TQueue[String]]
+  private val buckets = TMap.empty[Long, TQueue[PublisherResponse]]
 
   private val uid = TRef.make(0L)
 
+
+
   val getId: UIO[Long] = uid.flatMap(_.updateAndGet(_ + 1)).commit
 
-  def pushMessageTo(route: NonEmptyChunk[Route], msg: String) = {
-    val routes = getSubRoutes(route)
+
+
+  def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] = {
+    val routes = getSubRoutesFrom(uriPath)
 
     STM.atomically {
       for {
@@ -28,7 +32,7 @@ object BrokerSTM extends BrokerRepository.Service {
         _    <- STM.foreach_(set) { key =>
           for {
             queueM <- qMap.get(key)
-            queue  <- queueM.fold(TQueue.unbounded[String])(STM.succeed(_))
+            queue  <- queueM.fold(TQueue.unbounded[PublisherResponse])(STM.succeed(_))
             _      <- queue.offer(msg)
           } yield ()
         }
@@ -37,12 +41,12 @@ object BrokerSTM extends BrokerRepository.Service {
   }
 
   def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] = {
-    val keys = topics.flatMap(getSubRoutesFrom)
+    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
 
     STM.atomically {
       for {
         qMap <- buckets
-        _    <- STM.unlessM(qMap.contains(id))(STM.succeed(TQueue.unbounded[String] >>= (qMap.put(id, _))))
+        _    <- STM.unlessM(qMap.contains(id))(STM.succeed(TQueue.unbounded[PublisherResponse] >>= (qMap.put(id, _))))
         sMap <- subscriptions
         _    <- STM.foreach_(keys)(key => sMap.merge(key, Set(id))(_ union _))
       } yield ()
@@ -50,7 +54,7 @@ object BrokerSTM extends BrokerRepository.Service {
   }
 
   def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] = {
-    val keys = topics.flatMap(getSubRoutesFrom)
+    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
 
     STM.atomically {
       for {
@@ -64,18 +68,18 @@ object BrokerSTM extends BrokerRepository.Service {
     }
   }
 
-  def getQueue(id: Long): IO[Option[Nothing], TQueue[String]] = {
+  def getQueue(id: Long): IO[Option[Nothing], TQueue[PublisherResponse]] = {
     STM.atomically {
       buckets.flatMap(map => map.get(id).flatMap(o => STM.fromOption(o)))
     }
   }
 
   // TODO: Is this really necessary?
-  def addTopic(uriPath: NonEmptyChunk[Route]): UIO[Unit] =
-    (getSubRoutes _ andThen writeTopic)(uriPath)
+  def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit] =
+    (getSubRoutesFrom _ andThen writeTopic)(uriPath)
 
-  private val writeTopic: Chunk[Route] => UIO[Unit] =
-    (keys: Chunk[Route]) =>
+  private val writeTopic: Seq[String] => UIO[Unit] =
+    (keys: Seq[String]) =>
       STM.atomically {
         for {
           sMap <- subscriptions
@@ -83,18 +87,17 @@ object BrokerSTM extends BrokerRepository.Service {
         } yield ()
       }
 
-  // TODO: Refactor the functions below to one single FN
-  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
-    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
+  private def getSubRoutesFrom(segments: Seq[String]): Seq[String] =
+    segments.scanLeft("")(_ + _).drop(1)
 
-  // For now handles the traffic coming from the grpc side
-  private def getSubRoutesFrom(path: Path): Seq[Route] =
-    path.segments.scanLeft(Route(""))((acc, c) => Route(acc.asString + c)).drop(1)
-
-  private def buildRoute(uriPath: NonEmptyChunk[Route]): Route =
-    Route(uriPath.mkString)
+  private def buildRoute(uriPath: NonEmptyChunk[String]): String =
+    uriPath.mkString
 
 }
+
+//  // TODO: Refactor the functions below to one single FN
+//  private def getSubRoutes(uriRoute: NonEmptyChunk[String]): Chunk[String] =
+//    uriRoute.scan("")(_ + _).drop(1)
 
 //  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
 //    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)

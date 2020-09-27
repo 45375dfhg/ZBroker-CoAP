@@ -3,12 +3,13 @@ import Controller._
 import domain.api.CoapDeserializerService.{IgnoredMessageWithId, IgnoredMessageWithIdOption, extractFromChunk}
 import domain.api.ResponseService.getAcknowledgment
 import domain.api._
+import domain.model.broker.BrokerRepository
 import domain.model.chunkstream.ChunkStreamRepository
 import domain.model.coap._
 import domain.model.coap.header.CoapId
 import domain.model.exception.{MissingAddress, NoResponseAvailable}
 import domain.model.sender.MessageSenderRepository.sendMessage
-
+import subgrpc.subscription.{Path, PublisherResponse}
 import zio.{IO, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
@@ -32,7 +33,15 @@ object Program {
       .collect(validMessage)
       .tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage)
-      .tap(a => putStrLn(a.toString))
+      .foreach(pushViableMessage)
+
+  private def pushViableMessage(m: CoapMessage) = {
+    (for {
+      route   <- m.getPath
+      content <- m.getContent
+      _       <- BrokerRepository.pushMessageTo(route, PublisherResponse(Some(Path(route)), content)) // TODO: write proper extension
+    } yield ()).orElseSucceed(())
+  }
 
   private def sendAcknowledgment(tuple: (Option[SocketAddress], CoapMessage)) = {
     tuple match {
