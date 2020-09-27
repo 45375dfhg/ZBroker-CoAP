@@ -30,26 +30,12 @@ message SubscriptionRequest {
 
 message PublisherResponse {
 
-  // message either confirms e.g. deletion or carries topic content
-  oneof response_type {
-    topic_content v = 1;
-    confirmation s = 2;
-  }
-
-  message topic_content {
     // A reference to the "subscription" field
     Path identifier = 1;
 
     // The topic's newest content
-    repeated string content = 2;
-  }
-
-  message confirmation {
-    bool success = 1;
-  }
+    string content = 2;
 }
-
-
 
 /* A Path is equivalent to the path of an URI, yet does NOT contain slashes
  * and its segments are separated strings.

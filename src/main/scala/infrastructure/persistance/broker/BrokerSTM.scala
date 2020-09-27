@@ -2,9 +2,8 @@ package infrastructure.persistance.broker
 
 import domain.model.RouteModel._
 import domain.model.broker.BrokerRepository
-
+import domain.model.exception.{GatewayError, UnexpectedError}
 import subgrpc.subscription.Path
-
 import zio.stm._
 import zio._
 
@@ -16,23 +15,25 @@ object BrokerSTM extends BrokerRepository.Service {
 
   private val uid = TRef.make(0L)
 
-  val getId = uid.flatMap(_.updateAndGet(_ + 1)).commit
+  val getId: UIO[Long] = uid.flatMap(_.updateAndGet(_ + 1)).commit
 
   def pushMessageTo(route: NonEmptyChunk[Route], msg: String) = {
     val routes = getSubRoutes(route)
 
-    for {
-      sMap <- subscriptions
-      set  <- STM.foreach(routes)(key => sMap.getOrElse(key, Set.empty[Long])).map(_.reduce(_ union _))
-      qMap <- buckets
-      _    <- STM.foreach_(set) { key =>
-        for {
-          queueM <- qMap.get(key)
-          queue  <- queueM.fold(TQueue.unbounded[String])(STM.succeed(_))
-          _      <- queue.offer(msg)
-        } yield ()
-      }
-    } yield ()
+    STM.atomically {
+      for {
+        sMap <- subscriptions
+        set  <- STM.foreach(routes)(route => sMap.getOrElse(route, Set.empty[Long])).map(_.reduce(_ union _))
+        qMap <- buckets
+        _    <- STM.foreach_(set) { key =>
+          for {
+            queueM <- qMap.get(key)
+            queue  <- queueM.fold(TQueue.unbounded[String])(STM.succeed(_))
+            _      <- queue.offer(msg)
+          } yield ()
+        }
+      } yield ()
+    }
   }
 
   def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] = {
@@ -60,6 +61,12 @@ object BrokerSTM extends BrokerRepository.Service {
                   }
                 }
       } yield ()
+    }
+  }
+
+  def getQueue(id: Long): IO[Option[Nothing], TQueue[String]] = {
+    STM.atomically {
+      buckets.flatMap(map => map.get(id).flatMap(o => STM.fromOption(o)))
     }
   }
 
