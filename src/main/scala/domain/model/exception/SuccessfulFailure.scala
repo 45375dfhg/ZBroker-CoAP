@@ -23,3 +23,11 @@ case object MissingOptions extends SuccessfulFailure {
 case object MissingRoutes extends SuccessfulFailure {
   override def msg = "The message does not contain any options with an Uri-Path."
 }
+
+case object MissingPayload extends SuccessfulFailure {
+  override def msg = "No payload was provided which can be passed to subscribers."
+}
+
+case object UnsupportedPayload extends SuccessfulFailure {
+  override def msg = "Payload format is not supported."
+}
