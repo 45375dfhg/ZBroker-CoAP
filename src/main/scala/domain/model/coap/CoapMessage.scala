@@ -1,6 +1,5 @@
 package domain.model.coap
 
-import domain.model.RouteModel.Route
 import domain.model.coap.header.CoapId
 import domain.model.coap.option.StringCoapOptionValueContent
 import domain.model.exception._
@@ -36,7 +35,11 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   }
 
   val toPublisherResponse: IO[SuccessfulFailure, PublisherResponse] =
-    (getPath <*> getContent).map { case (route, content) => PublisherResponse(Some(Path(route.toSeq)), content) }
+    (getPath <*> getContent).map { case (route, content) => toPublisherResponseWith(route, content) }
+
+  // TODO: should neither be part of the case class nor the companion object
+  def toPublisherResponseWith(route: NonEmptyChunk[String], content: String) =
+    PublisherResponse(Some(Path(route.toSeq)), content)
 
 }
 

@@ -7,9 +7,9 @@ import domain.model.broker.BrokerRepository
 import domain.model.chunkstream.ChunkStreamRepository
 import domain.model.coap._
 import domain.model.coap.header.CoapId
-import domain.model.exception.{MissingAddress, NoResponseAvailable}
+import domain.model.exception.{MissingAddress, NoResponseAvailable, UnexpectedError}
 import domain.model.sender.MessageSenderRepository.sendMessage
-import subgrpc.subscription.{Path, PublisherResponse}
+
 import zio.{IO, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
@@ -26,20 +26,20 @@ object Program {
 
   val coapStream =
     ChunkStreamRepository
-      .getChunkStream
-      .mapM { case (address, chunk) => UIO(address) <*> extractFromChunk(chunk) } // TODO: REFACTOR THE EITHER PART
-      .collect(messagesAndErrorsWithId)
-      .tap(sendResets)
-      .collect(validMessage)
-      .tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
-      .map(isolateMessage)
-      .foreach(pushViableMessage)
+      .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
+
+      (UIO.succeed(address) <*> extractFromChunk(chunk))
+        .collect(UnexpectedError("fuck"))(messagesAndErrorsWithId).tap(sendReset)
+        .collect(UnexpectedError("fuck"))(validMessage).tap(sendAcknowledgment)
+        .map(isolateMessage).tap(pushViableMessage)
+
+    }.runDrain
 
   private def pushViableMessage(m: CoapMessage) = {
     (for {
       route   <- m.getPath
       content <- m.getContent
-      _       <- BrokerRepository.pushMessageTo(route, PublisherResponse(Some(Path(route)), content)) // TODO: write proper extension
+      _       <- BrokerRepository.pushMessageTo(route, m.toPublisherResponseWith(route, content)) // TODO: write proper extension
     } yield ()).orElseSucceed(())
   }
 
@@ -56,7 +56,7 @@ object Program {
   private def isolateMessage(tuple: (Option[SocketAddress], CoapMessage)) =
     tuple._2
 
-  private def sendResets(tuple: (Option[SocketAddress], Either[(MessageFormatError, CoapId), CoapMessage])) =
+  private def sendReset(tuple: (Option[SocketAddress], Either[(MessageFormatError, CoapId), CoapMessage])) =
     tuple match {
       case (address, either) => either match {
         case Left(value) =>
@@ -82,3 +82,13 @@ object Program {
     (Option[SocketAddress], Either[IgnoredMessageWithId, CoapMessage])]
 
 }
+
+//ChunkStreamRepository
+//  .getChunkStream
+//  .mapM { case (address, chunk) => UIO(address) <*> extractFromChunk(chunk) } // TODO: REFACTOR THE EITHER PART
+//  .collect(messagesAndErrorsWithId)
+//  .tap(sendResets)
+//  .collect(validMessage)
+//  .tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
+//  .map(isolateMessage)
+//  .foreach(pushViableMessage)
