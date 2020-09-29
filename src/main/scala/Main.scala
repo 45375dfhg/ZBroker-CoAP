@@ -6,7 +6,7 @@ import zio.console._
 
 object Main extends App {
 
-  val logic = Program.coapStream
+  val logic = Program.coapStream <&> SubscriptionServer.myAppLogic
 
   val partialLayer =
     (ConfigRepositoryEnvironment.fromMemory >+> EndpointEnvironment.fromChannel) >+>

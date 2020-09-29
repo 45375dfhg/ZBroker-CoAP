@@ -37,11 +37,20 @@ class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with
 
 object SubscriptionServer extends ServerMain {
 
+  override def port = 8980
+
+  val subscriptionService = new SubscriptionService()
+
+  def serviceList: ServiceList[ZEnv] = ServiceList.add(subscriptionService).provideLayer(ZEnv.live ++ BrokerRepositoryEnvironment.fromSTM)
+
+  override def services: ServiceList[ZEnv] = serviceList
+
 //  override def port: Int = 8980
 //
 //  val subscriptionService = new SubscriptionService()
 //
 //  override def services: ServiceList[ZEnv] =
 //    ServiceList.add(subscriptionService).provideLayer(BrokerRepositoryEnvironment.fromSTM)
+
 
 }
