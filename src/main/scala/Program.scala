@@ -31,7 +31,10 @@ object Program {
       (UIO.succeed(address) <*> extractFromChunk(chunk))
         .collect(UnexpectedError("fuck"))(messagesAndErrorsWithId).tap(sendReset)
         .collect(UnexpectedError("fuck"))(validMessage).tap(sendAcknowledgment)
-        .map(isolateMessage).tap(pushViableMessage)
+        .map(isolateMessage).collect(UnexpectedError("fuck")) {
+          case t @ CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
+        }
+        .tap(pushViableMessage)
 
     }.runDrain
 

@@ -1,91 +1,124 @@
 package infrastructure.persistance.broker
 
 import domain.model.broker.BrokerRepository
+import infrastructure.persistance.broker.BrokerSTM.getSubRoutesFrom
 import subgrpc.subscription.{Path, PublisherResponse}
 import zio.stm._
 import zio._
 
+
+class BrokerSTM(
+  val buckets: TMap[Long, TQueue[PublisherResponse]],
+  val subscriptions: TMap[String, Set[Long]],
+  val counter: TRef[Long]
+) {
+  def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] =
+    STM.atomically {
+      for {
+        _    <- STM.unlessM(buckets.contains(id))(TQueue.unbounded[PublisherResponse] >>= (buckets.put(id, _)))
+        keys =  topics.flatMap(path => BrokerSTM.getSubRoutesFrom(path.segments))
+        _    <- STM.foreach_(keys)(key => subscriptions.merge(key, Set(id))(_ union _))
+      } yield ()
+    }
+
+  def getQueue(id: Long): IO[Option[Nothing], TQueue[PublisherResponse]] =
+    buckets.get(id).flatMap(STM.fromOption(_)).commit
+}
+
+// TODO: just remove the repository at this point ...
 object BrokerSTM extends BrokerRepository.Service {
-
-  private val subscriptions = TMap.empty[String, Set[Long]]
-
-  private val buckets = TMap.empty[Long, TQueue[PublisherResponse]]
-
-  private val uid = TRef.make(0L)
-
-  val getId: UIO[Long] = uid.flatMap(_.updateAndGet(_ + 1)).commit
-
-  def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] = {
-    val routes = getSubRoutesFrom(uriPath)
-
-    STM.atomically {
-      for {
-        sMap <- subscriptions
-        set  <- STM.foreach(routes)(route => sMap.getOrElse(route, Set.empty[Long])).map(_.reduce(_ union _))
-        qMap <- buckets
-        _    <- STM.foreach_(set) { key =>
-          for {
-            queueM <- qMap.get(key)
-            queue  <- queueM.fold(TQueue.unbounded[PublisherResponse])(STM.succeed(_))
-            _      <- queue.offer(msg)
-          } yield ()
-        }
-      } yield ()
-    }
-  }
-
-  def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] = {
-    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
-
-    STM.atomically {
-      for {
-        qMap <- buckets
-        _    <- STM.unlessM(qMap.contains(id))(STM.succeed(TQueue.unbounded[PublisherResponse] >>= (qMap.put(id, _))))
-        sMap <- subscriptions
-        _    <- STM.foreach_(keys)(key => sMap.merge(key, Set(id))(_ union _))
-      } yield ()
-    }
-  }
-
-  def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] = {
-    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
-
-    STM.atomically {
-      for {
-        sMap <- subscriptions
-        _    <- STM.foreach_(keys) { key =>
-                  STM.whenM(sMap.get(key).map(_.fold(false)(_.contains(id)))) {
-                    sMap.merge(key, Set(id))(_ diff _)
-                  }
-                }
-      } yield ()
-    }
-  }
-
-  def getQueue(id: Long): IO[Option[Nothing], TQueue[PublisherResponse]] = {
-    STM.atomically {
-      buckets.flatMap(map => map.get(id).flatMap(o => STM.fromOption(o)))
-    }
-  }
-
-  // TODO: Is this really necessary?
-  def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit] =
-    (getSubRoutesFrom _ andThen writeTopic)(uriPath)
-
-  private val writeTopic: Seq[String] => UIO[Unit] =
-    (keys: Seq[String]) =>
-      STM.atomically {
-        for {
-          sMap <- subscriptions
-          _    <- STM.foreach_(keys)(key => sMap.putIfAbsent(key, Set.empty[Long]))
-        } yield ()
-      }
 
   private def getSubRoutesFrom(segments: Seq[String]): Seq[String] =
     segments.scanLeft("")(_ + _).drop(1)
 
-  private def buildRoute(uriPath: NonEmptyChunk[String]): String =
-    uriPath.mkString
+  def make: STM[Nothing, BrokerSTM] =
+    for {
+      buckets <- TMap.empty[Long, TQueue[PublisherResponse]]
+      subs    <- TMap.empty[String, Set[Long]]
+      counter <- TRef.make(0L)
+      repo    =  new BrokerSTM(buckets, subs, counter)
+    } yield repo
+
+
+//  private val subscriptions = TMap.empty[String, Set[Long]]
+//
+//  private val buckets = TMap.empty[Long, TQueue[PublisherResponse]]
+//
+//  private val uid = TRef.make(0L)
+//
+//  val getId: UIO[Long] = uid.flatMap(_.updateAndGet(_ + 1)).commit
+//
+//  def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] = {
+//    val routes = getSubRoutesFrom(uriPath)
+//
+//    STM.atomically {
+//      for {
+//        sMap <- subscriptions
+//        set  <- STM.foreach(routes)(route => sMap.getOrElse(route, Set.empty[Long])).map(_.reduce(_ union _))
+//        qMap <- buckets
+//        _    <- STM.foreach_(set) { key =>
+//          for {
+//            queueM <- qMap.get(key)
+//            queue  <- queueM.fold(TQueue.unbounded[PublisherResponse])(STM.succeed(_))
+//            _      <- queue.offer(msg)
+//          } yield ()
+//        }
+//      } yield ()
+//    }
+//  }
+//
+//  def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] = {
+//    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
+//
+//    STM.atomically {
+//      for {
+//        qMap <- buckets
+//        _    <- STM.unlessM(qMap.contains(id))(TQueue.unbounded[PublisherResponse] >>= (qMap.put(id, _)))
+//        sMap <- subscriptions
+//        _    <- STM.foreach_(keys)(key => sMap.merge(key, Set(id))(_ union _))
+//      } yield ()
+//    }
+//  }
+//
+//  def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] = {
+//    val keys = topics.flatMap(path => getSubRoutesFrom(path.segments))
+//
+//    STM.atomically {
+//      for {
+//        sMap <- subscriptions
+//        _    <- STM.foreach_(keys) { key =>
+//                  STM.whenM(sMap.get(key).map(_.fold(false)(_.contains(id)))) {
+//                    sMap.merge(key, Set(id))(_ diff _)
+//                  }
+//                }
+//      } yield ()
+//    }
+//  }
+//
+//  def getQueue(id: Long): IO[Option[Nothing], TQueue[PublisherResponse]] = {
+//    STM.atomically {
+//      buckets.flatMap(map => map.get(id).flatMap(o => STM.fromOption(o)))
+//    }
+//  }
+//
+//  // TODO: Is this really necessary?
+//  def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit] =
+//    (getSubRoutesFrom _ andThen writeTopic)(uriPath)
+//
+//  private val writeTopic: Seq[String] => UIO[Unit] =
+//    (keys: Seq[String]) =>
+//      STM.atomically {
+//        for {
+//          sMap <- subscriptions
+//          _    <- STM.foreach_(keys)(key => sMap.putIfAbsent(key, Set.empty[Long]))
+//        } yield ()
+//      }
+//
+//  private def getSubRoutesFrom(segments: Seq[String]): Seq[String] =
+//    segments.scanLeft("")(_ + _).drop(1)
+//
+//  private def buildRoute(uriPath: NonEmptyChunk[String]): String =
+//    uriPath.mkString
 
 }
 
@@ -198,3 +231,4 @@ object BrokerSTM extends BrokerRepository.Service {
 //      } yield bool
 //    }
 //  }
+
