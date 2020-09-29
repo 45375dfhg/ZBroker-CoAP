@@ -1,8 +1,6 @@
 package infrastructure.persistance.broker
 
-import domain.model.RouteModel._
 import domain.model.broker.BrokerRepository
-import domain.model.exception.{GatewayError, UnexpectedError}
 import subgrpc.subscription.{Path, PublisherResponse}
 import zio.stm._
 import zio._
@@ -15,11 +13,7 @@ object BrokerSTM extends BrokerRepository.Service {
 
   private val uid = TRef.make(0L)
 
-
-
   val getId: UIO[Long] = uid.flatMap(_.updateAndGet(_ + 1)).commit
-
-
 
   def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] = {
     val routes = getSubRoutesFrom(uriPath)

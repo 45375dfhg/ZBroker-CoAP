@@ -1,8 +1,6 @@
 package domain.model.broker
 
-import domain.model.RouteModel.Route
-import domain.model.exception.GatewayError
-import subgrpc.subscription.PublisherResponse
+import subgrpc.subscription.{Path, PublisherResponse}
 import zio.stm.TQueue
 import zio.{Has, IO, NonEmptyChunk, UIO, URIO, ZIO}
 
@@ -14,6 +12,8 @@ object BrokerRepository {
     def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit]
     def getQueue(id: Long): IO[Option[Nothing], TQueue[PublisherResponse]]
     def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit]
+    def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit]
+    def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit]
 
     val getId: UIO[Long]
   }
@@ -26,6 +26,12 @@ object BrokerRepository {
 
   def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.pushMessageTo(uriPath, msg))
+
+  def addSubscriberTo(topics: Seq[Path], id: Long): URIO[BrokerRepository, Unit] =
+    ZIO.accessM(_.get.addSubscriberTo(topics, id))
+
+  def removeSubscriber(topics: Seq[Path], id: Long): URIO[BrokerRepository, Unit] =
+    ZIO.accessM(_.get.removeSubscriber(topics, id))
 
   val getId: URIO[BrokerRepository, Long] =
     ZIO.accessM(_.get.getId)
