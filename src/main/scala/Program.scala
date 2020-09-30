@@ -7,9 +7,8 @@ import domain.model.broker.BrokerRepository
 import domain.model.chunkstream.ChunkStreamRepository
 import domain.model.coap._
 import domain.model.coap.header.CoapId
-import domain.model.exception.{MissingAddress, NoResponseAvailable, UnexpectedError}
+import domain.model.exception._
 import domain.model.sender.MessageSenderRepository.sendMessage
-
 import zio.{IO, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
@@ -29,9 +28,9 @@ object Program {
       .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
 
       (UIO.succeed(address) <*> extractFromChunk(chunk))
-        .collect(UnexpectedError("fuck"))(messagesAndErrorsWithId).tap(sendReset)
-        .collect(UnexpectedError("fuck"))(validMessage).tap(sendAcknowledgment)
-        .map(isolateMessage).collect(UnexpectedError("fuck")) {
+        .collect(PartialFnMismatch)(messagesAndErrorsWithId).tap(sendReset)
+        .collect(PartialFnMismatch)(validMessage).tap(sendAcknowledgment)
+        .map(isolateMessage).collect(PartialFnMismatch) {
           case t @ CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
         }
         .tap(pushViableMessage)
