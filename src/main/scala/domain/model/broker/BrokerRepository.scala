@@ -1,9 +1,11 @@
 package domain.model.broker
 
-import domain.model.exception.MissingBrokerBucket.MissingBrokerBucket
-import subgrpc.subscription.{Path, PublisherResponse}
+import domain.model.exception.MissingBrokerBucket._
+
+import subgrpc.subscription.PublisherResponse
+
+import zio._
 import zio.stm.TQueue
-import zio.{Has, IO, NonEmptyChunk, UIO, URIO, ZIO}
 
 object BrokerRepository {
 
@@ -12,12 +14,21 @@ object BrokerRepository {
   trait Service {
     def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit]
     def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]]
-    def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit]
-    def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit]
-    def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit]
+    def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit]
+    def addSubscriberTo(topics: Paths, id: Long): UIO[Unit]
+    def removeSubscriber(topics: Paths, id: Long): UIO[Unit]
 
     val getNextId: UIO[Long]
   }
+
+  /**
+   * The equivalent of one or many URI paths which consist of one or many segments.
+   */
+  type Paths    = NonEmptyChunk[NonEmptyChunk[String]]
+  /**
+   * One or many segments of an URI path.
+   */
+  type Segments = NonEmptyChunk[String]
 
   def addTopic(uriPath: NonEmptyChunk[String]): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.addTopic(uriPath))
@@ -25,13 +36,13 @@ object BrokerRepository {
   def getQueue(id: Long): ZIO[BrokerRepository, MissingBrokerBucket, TQueue[PublisherResponse]] =
     ZIO.accessM(_.get.getQueue(id))
 
-  def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): URIO[BrokerRepository, Unit] =
+  def pushMessageTo(uriPath: Segments, msg: PublisherResponse): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.pushMessageTo(uriPath, msg))
 
-  def addSubscriberTo(topics: Seq[Path], id: Long): URIO[BrokerRepository, Unit] =
+  def addSubscriberTo(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.addSubscriberTo(topics, id))
 
-  def removeSubscriber(topics: Seq[Path], id: Long): URIO[BrokerRepository, Unit] =
+  def removeSubscriber(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.removeSubscriber(topics, id))
 
   val getNextId: URIO[BrokerRepository, Long] =

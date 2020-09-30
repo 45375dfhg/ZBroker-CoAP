@@ -1,11 +1,11 @@
 package infrastructure.persistance.broker
 
 import domain.model.broker.BrokerRepository
+import domain.model.broker.BrokerRepository._
 import domain.model.exception.MissingBrokerBucket
-import domain.model.exception.MissingBrokerBucket.MissingBrokerBucket
+import domain.model.exception.MissingBrokerBucket._
 
-import subgrpc.subscription.{Path, PublisherResponse}
-
+import subgrpc.subscription.PublisherResponse
 import zio.stm._
 import zio._
 
@@ -35,11 +35,11 @@ class TransactionalBroker (
    * @param topics A sequence of topics that the user wants to subscribe to.
    * @param id The connection id of the user.
    */
-  def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] =
+  def addSubscriberTo(topics: Paths, id: Long): UIO[Unit] =
     STM.atomically {
       for {
         _    <- STM.unlessM(buckets.contains(id))(TQueue.unbounded[PublisherResponse] >>= (buckets.put(id, _)))
-        keys =  topics.map(path => TransactionalBroker.buildRoute(path.segments))
+        keys =  topics.map(path => TransactionalBroker.buildRoute(path))
         _    <- STM.foreach_(keys)(key => subscriptions.merge(key, Set(id))(_ union _))
       } yield ()
     }
@@ -61,7 +61,7 @@ class TransactionalBroker (
    * @param uriPath An URI path which represents the topic to which the message is addressed.
    * @param msg The message - already converted into the PublisherResponse format.
    */
-  def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] =
+  def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit] =
     STM.atomically {
       for {
         routes <- STM.succeed(TransactionalBroker.getSubRoutesFrom(uriPath))
@@ -79,7 +79,7 @@ class TransactionalBroker (
   /**
    * Adds a URI path and it's sub-routes to the TransactionalBroker.
    */
-  def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit] =
+  def addTopic(uriPath: Segments): UIO[Unit] =
     STM.atomically {
       for {
         keys <- STM.succeed(TransactionalBroker.getSubRoutesFrom(uriPath))
@@ -87,16 +87,15 @@ class TransactionalBroker (
       } yield ()
     }
 
-  /**
-   * WARNING: NOT A FINAL IMPLEMENTATION! THIS WILL LEAD TO INCONSISTENT BEHAVIOUR AND FRAGMENTS!
+  /**TODO: WARNING: NOT A FINAL IMPLEMENTATION! THIS WILL LEAD TO INCONSISTENT BEHAVIOUR AND FRAGMENTS!
    * Removes a subscriber by its ID from one or more topics.
    * @param topics A sequence of topics
    * @param id The unique ID of a subscriber
    */
-  def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] =
+  def removeSubscriber(topics: Paths, id: Long): UIO[Unit] =
     STM.atomically {
       for {
-        keys <- STM.succeed(topics.map(path => TransactionalBroker.buildRoute(path.segments)))
+        keys <- STM.succeed(topics.map(path => TransactionalBroker.buildRoute(path)))
         _    <- STM.foreach_(keys) { key =>
                   STM.whenM(subscriptions.get(key).map(_.fold(false)(_.contains(id)))) {
                     subscriptions.merge(key, Set(id))(_ diff _)
@@ -108,8 +107,11 @@ class TransactionalBroker (
 
 object TransactionalBroker {
 
-  private def getSubRoutesFrom(segments: Seq[String]): Seq[String] =
+  private def getSubRoutesFrom(segments: Segments): Seq[String] =
     segments.scanLeft("")(_ + _).tail
+
+  private def buildRoute(uriPath: Segments): String =
+    uriPath.mkString
 
   def make: STM[Nothing, TransactionalBroker] =
     for {
@@ -118,8 +120,5 @@ object TransactionalBroker {
       counter <- TRef.make(0L)
       repo    =  new TransactionalBroker(buckets, subs, counter)
     } yield repo
-
-  private def buildRoute(uriPath: Seq[String]): String =
-    uriPath.mkString
 
 }

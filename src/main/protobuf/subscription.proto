@@ -12,6 +12,7 @@ service SubscriptionService {
  * The action will be matched to either add or remove one or many subscriptions. */
 
 message SubscriptionRequest {
+
   // Describes the intention behind the request in regards to the path
   enum Action {
     ADD = 0;
