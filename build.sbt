@@ -6,9 +6,10 @@ version := "0.1"
 
 run / fork := true
 
+
 PB.targets in Compile := Seq(
-    scalapb.gen(grpc = true) -> (sourceManaged in Compile).value / "scalapb",
-    scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value / "scalapb"
+    scalapb.gen(grpc = true) -> (sourceManaged in Compile).value,
+    scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value,
 )
 
 libraryDependencies ++= Seq(
@@ -21,7 +22,7 @@ libraryDependencies ++= Seq(
     "io.estatico" %% "newtype" % "0.4.4",
     // ZIO GRPC
     "io.grpc" % "grpc-netty" % "1.31.1",
-    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
 )
 
 scalacOptions ++= Seq(
