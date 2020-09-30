@@ -15,8 +15,6 @@ trait GatewayError extends Throwable {
     this.getClass.getSimpleName + ": " + msg + " in: " + this.getStackTrace.mkString("Array(", ", ", ")")
 }
 
-final case class UnexpectedError(msg: String) extends GatewayError
-
 final case class SystemError(msg: String, cause: Throwable) extends GatewayError {
   override def fullMsg: String = super.fullMsg + cause
 }
