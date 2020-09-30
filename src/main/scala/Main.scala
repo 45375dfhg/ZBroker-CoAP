@@ -6,16 +6,15 @@ import zio.console._
 
 object Main extends App {
 
-  val logic = Program.coapStream <&> SubscriptionServer.myAppLogic
+  val program = Program.coapStream <&> SubscriptionServer.logic
 
   val partialLayer =
-    (ConfigRepositoryEnvironment.fromMemory >+> EndpointEnvironment.fromChannel) >+>
+    BrokerRepositoryEnvironment.fromSTM ++ (ConfigRepositoryEnvironment.fromMemory >+> EndpointEnvironment.fromChannel) >+>
       (ChunkStreamRepositoryEnvironment.fromSocket ++
-        MessageSenderRepositoryEnvironment.fromSocket ++
-        BrokerRepositoryEnvironment.fromSTM)
+        MessageSenderRepositoryEnvironment.fromSocket)
 
   def run(args: List[String]): URIO[ZEnv with Console, ExitCode] =
-    logic.provideCustomLayer(partialLayer).orDie.exitCode
+    program.provideCustomLayer(partialLayer).orDie.exitCode
 
 }
 

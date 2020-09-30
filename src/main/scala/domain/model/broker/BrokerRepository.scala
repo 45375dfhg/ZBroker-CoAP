@@ -17,6 +17,7 @@ object BrokerRepository {
     def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit]
     def addSubscriberTo(topics: Paths, id: Long): UIO[Unit]
     def removeSubscriber(topics: Paths, id: Long): UIO[Unit]
+    def getSubscribers(topic: String): UIO[Set[Long]]
 
     val getNextId: UIO[Long]
   }
@@ -44,6 +45,9 @@ object BrokerRepository {
 
   def removeSubscriber(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.removeSubscriber(topics, id))
+
+  def getSubscribers(topic: String): URIO[BrokerRepository, Set[Long]] =
+    ZIO.accessM(_.get.getSubscribers(topic))
 
   val getNextId: URIO[BrokerRepository, Long] =
     ZIO.accessM(_.get.getNextId)

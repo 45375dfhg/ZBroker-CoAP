@@ -3,14 +3,15 @@
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository.BrokerRepository
 import infrastructure.environment.BrokerRepositoryEnvironment
-import io.grpc.Status
+import io.grpc.protobuf.services.ProtoReflectionService
+import io.grpc.{ServerBuilder, Status}
 import scalapb.zio_grpc.CanBind.canBindAny
-import scalapb.zio_grpc.{ServerMain, ServiceList}
+import scalapb.zio_grpc.{Server, ServerLayer, ServerMain, ServiceList}
 import subgrpc.subscription.SubscriptionRequest.Action
 import subgrpc.subscription._
 import zio.console.putStrLn
 import zio.stream.{Stream, ZStream}
-import zio.{NonEmptyChunk, Schedule, ZEnv}
+import zio.{Has, NonEmptyChunk, Schedule, ZEnv, ZLayer}
 
 import scala.concurrent.duration.Duration
 
@@ -21,18 +22,44 @@ class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with
   override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository, Status, PublisherResponse] = {
 
     ZStream.fromEffect(BrokerRepository.getNextId).flatMap { id =>
-
-      request
-        .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
-        // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
-        .tap { case (action, paths) => action match {
-            case Action.ADD    => putStrLn("fuck") *> BrokerRepository.addSubscriberTo(paths, id)
-            case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
-          }
+      ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL.withDescription(id.toString), q => ZStream.fromTQueue(q)))
+        .zipLeft {
+          for {
+            _ <- request
+              .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
+              // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
+              .tap { case (action, paths) => action match {
+                case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
+                case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
+              }
+              }
+          } yield ()
         }
-        .zipRight(ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL.withDescription(id.toString), ZStream.fromTQueue)))
-    } // ZStream.fromIterable(Seq(PublisherResponse(None))) //.repeatElements(Schedule.forever)
-    //
+    }
+
+//      for {
+//        _ <- request
+//          .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
+//          // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
+//          .tap { case (action, paths) => action match {
+//            case Action.ADD => putStrLn("fuck") *> BrokerRepository.addSubscriberTo(paths, id)
+//            case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
+//          }
+//          }
+//      } yield ()
+//    }
+
+//      request
+//        .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
+//        // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
+//        .tap { case (action, paths) => action match {
+//            case Action.ADD    => putStrLn("fuck") *> BrokerRepository.addSubscriberTo(paths, id)
+//            case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
+//          }
+//        }
+//        .zipRight(ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL.withDescription(id.toString), ZStream.fromTQueue)))
+//    } // ZStream.fromIterable(Seq(PublisherResponse(None))) //.repeatElements(Schedule.forever)
+//
   }
 
 }
@@ -69,15 +96,13 @@ object SubscriptionServer extends ServerMain {
 
   val subscriptionService = new SubscriptionService()
 
-  def serviceList: ServiceList[ZEnv] = ServiceList.add(subscriptionService).provideLayer(ZEnv.live ++ BrokerRepositoryEnvironment.fromSTM)
+  def service: ServiceList[ZEnv with BrokerRepository] = ServiceList.add(subscriptionService)
 
-  override def services: ServiceList[ZEnv] = serviceList
+  override def builder = super.builder
+  
+  def live: ZLayer[ZEnv with BrokerRepository, Throwable, Has[Server.Service]] = ServerLayer.fromServiceList(builder, service)
 
+  val logic = welcome *> live.build.useForever
+  
+  override def services = ???
 }
-
-//  override def port: Int = 8980
-//
-//  val subscriptionService = new SubscriptionService()
-//
-//  override def services: ServiceList[ZEnv] =
-//    ServiceList.add(subscriptionService).provideLayer(BrokerRepositoryEnvironment.fromSTM)

@@ -9,7 +9,7 @@ import domain.model.coap._
 import domain.model.coap.header.CoapId
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository.sendMessage
-import zio.{IO, UIO}
+import zio.{IO, NonEmptyChunk, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
 import zio.stream.ZStream
@@ -27,6 +27,7 @@ object Program {
     ChunkStreamRepository
       .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
 
+      // TODO: COLLECT DOES NOT WORK HERE
       (UIO.succeed(address) <*> extractFromChunk(chunk))
         .collect(PartialFnMismatch)(messagesAndErrorsWithId).tap(sendReset)
         .collect(PartialFnMismatch)(validMessage).tap(sendAcknowledgment)
@@ -41,7 +42,7 @@ object Program {
     (for {
       route   <- m.getPath
       content <- m.getContent
-      _       <- BrokerRepository.pushMessageTo(route, m.toPublisherResponseWith(route, content)) // TODO: write proper extension
+      _       <- BrokerRepository.pushMessageTo(route, m.toPublisherResponseWith(route, content))
     } yield ()).orElseSucceed(())
   }
 

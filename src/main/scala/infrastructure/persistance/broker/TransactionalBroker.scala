@@ -44,14 +44,29 @@ class TransactionalBroker (
       } yield ()
     }
 
+  // TODO: REWRITE THIS PROPERLY TO AN EITHER
+  def getSubscribers(topic: String): UIO[Set[Long]] =
+    STM.atomically {
+      for {
+        r <- subscriptions.getOrElse(topic, Set(666L))
+      } yield r
+    }
+
   /**
    * Attempts the mailbox (a queue) mapped to the specified ID.
    * WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */
-  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]] =
-    buckets.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket).commit
+  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]] = {
+    STM.atomically {
+      for {
+        bool  <- buckets.contains(id)
+        _     <- if (bool) STM.unit else STM.retry
+        queue <- buckets.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)
+      } yield queue
+    }
+  }
 
   /**
    * Pushes a message to all its related topic's subscribers by acquiring all subscribers from
