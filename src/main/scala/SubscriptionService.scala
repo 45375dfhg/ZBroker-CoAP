@@ -2,13 +2,13 @@
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository.BrokerRepository
 import infrastructure.environment.BrokerRepositoryEnvironment
-import io.grpc.protobuf.services.ProtoReflectionService
-import io.grpc.{ServerBuilder, Status}
+
+import io.grpc.Status
 import scalapb.zio_grpc.CanBind.canBindAny
-import scalapb.zio_grpc.{ServerLayer, ServerMain, ServiceList}
+import scalapb.zio_grpc.{ServerMain, ServiceList}
 import subgrpc.subscription._
 import zio.stream.{Stream, ZStream}
-import zio.{ZEnv, ZIO, ZLayer, console}
+import zio.{ZEnv}
 import zio.console._
 
 class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with BrokerRepository, Any] {

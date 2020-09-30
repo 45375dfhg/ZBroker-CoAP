@@ -3,31 +3,64 @@ package infrastructure.persistance.broker
 import domain.model.broker.BrokerRepository
 import domain.model.exception.MissingBrokerBucket
 import domain.model.exception.MissingBrokerBucket.MissingBrokerBucket
+
 import subgrpc.subscription.{Path, PublisherResponse}
+
 import zio.stm._
 import zio._
 
-
+/**
+ * A broker which handles topics and subscribers. Topics are paired with their subscribers and
+ * each subscriber has its own mail system which is a queue.
+ * @param buckets A thread-safe bucket system for each incoming connection represented as a
+ *                Long where the connection is paired with its own queue to push messages into.
+ * @param subscriptions A thread-safe subscriber system where the key represents a topic and
+ *                      its subscribers are saved inside the paired Set. A subscriber is
+ *                      identified by its unique Long value.
+ * @param counter A thread-safe counter that acts as supplier for unique connection ID's.
+ */
 class TransactionalBroker (
   val buckets: TMap[Long, TQueue[PublisherResponse]],
   val subscriptions: TMap[String, Set[Long]],
   val counter: TRef[Long]
 ) extends BrokerRepository.Service {
 
+  /**
+   * Increments and then returns the next ID while being thread-safe.
+   */
   val getNextId: UIO[Long] = counter.updateAndGet(_ + 1).commit
 
+  /**
+   * Maps a new subscriber to one or multiple topics.
+   * @param topics A sequence of topics that the user wants to subscribe to.
+   * @param id The connection id of the user.
+   */
   def addSubscriberTo(topics: Seq[Path], id: Long): UIO[Unit] =
     STM.atomically {
       for {
         _    <- STM.unlessM(buckets.contains(id))(TQueue.unbounded[PublisherResponse] >>= (buckets.put(id, _)))
-        keys =  topics.flatMap(path => TransactionalBroker.buildRoute(path.segments))
+        keys =  topics.map(path => TransactionalBroker.buildRoute(path.segments))
         _    <- STM.foreach_(keys)(key => subscriptions.merge(key, Set(id))(_ union _))
       } yield ()
     }
 
+  /**
+   * Attempts the mailbox (a queue) mapped to the specified ID.
+   * WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
+   * @param id The connection ID, used as a key value to get the queue.
+   * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
+   */
   def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]] =
-    buckets.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)commit
+    buckets.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket).commit
 
+  /**
+   * Pushes a message to all its related topic's subscribers by acquiring all subscribers from
+   * all sub-routes that result from the given route. Then those subscribers are merged these
+   * into a set to avoid duplicate messages. The message is then offered to each
+   * subscribers personal queue.
+   * @param uriPath An URI path which represents the topic to which the message is addressed.
+   * @param msg The message - already converted into the PublisherResponse format.
+   */
   def pushMessageTo(uriPath: NonEmptyChunk[String], msg: PublisherResponse): UIO[Unit] =
     STM.atomically {
       for {
@@ -43,6 +76,9 @@ class TransactionalBroker (
       } yield ()
     }
 
+  /**
+   * Adds a URI path and it's sub-routes to the TransactionalBroker.
+   */
   def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit] =
     STM.atomically {
       for {
@@ -51,10 +87,16 @@ class TransactionalBroker (
       } yield ()
     }
 
+  /**
+   * WARNING: NOT A FINAL IMPLEMENTATION! THIS WILL LEAD TO INCONSISTENT BEHAVIOUR AND FRAGMENTS!
+   * Removes a subscriber by its ID from one or more topics.
+   * @param topics A sequence of topics
+   * @param id The unique ID of a subscriber
+   */
   def removeSubscriber(topics: Seq[Path], id: Long): UIO[Unit] =
     STM.atomically {
       for {
-        keys <- STM.succeed(topics.flatMap(path => TransactionalBroker.getSubRoutesFrom(path.segments)))
+        keys <- STM.succeed(topics.map(path => TransactionalBroker.buildRoute(path.segments)))
         _    <- STM.foreach_(keys) { key =>
                   STM.whenM(subscriptions.get(key).map(_.fold(false)(_.contains(id)))) {
                     subscriptions.merge(key, Set(id))(_ diff _)
@@ -81,114 +123,3 @@ object TransactionalBroker {
     uriPath.mkString
 
 }
-
-//  // TODO: Refactor the functions below to one single FN
-//  private def getSubRoutes(uriRoute: NonEmptyChunk[String]): Chunk[String] =
-//    uriRoute.scan("")(_ + _).drop(1)
-
-//  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
-//    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
-//
-//  private def buildRoute(uriRoute: NonEmptyChunk[Route]): Route =
-//    Route(uriRoute.mkString)
-
-
-//  /**
-//   * Recursively collects all subscribers for a given route and its sub-routes recursively while also constructing
-//   * topics for the route and its sub-routes if not already existent
-//   *
-//   * @param uriRoute a split representation of the uri-path
-//   * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
-//   */
-//  def getSubscribersAndAddTopics(uriRoute: NonEmptyChunk[Route]): UIO[Set[Long]] =
-//    (getSubRoutes _ andThen readSubscribersAndWriteTopics) (uriRoute)
-//
-//  /**
-//   * Gets all subscribers recursively for a given route which means that sub-routes and their respective
-//   * subscribers are included in the result set.
-//   *
-//   * @param uriRoute a split representation of the uri-path
-//   * @return A set of all subscribers that subscribed to a sub-route of the given route including the full-route
-//   */
-//  def getSubscribers(uriRoute: NonEmptyChunk[Route]): UIO[Set[Long]] =
-//    (getSubRoutes _ andThen readSubscribers) (uriRoute)
-//
-//  /**
-//   * Writes a single subscriber to the given key
-//   *
-//   * @param uriRoute a split representation of the uri-path
-//   * @param id       the id of the subscriber, used as a key for the hashmap
-//   * @return The success of adding the subscriber as Boolean - success is mapped to true and vice versa
-//   */
-//  def addSubscriber(uriRoute: NonEmptyChunk[Route], id: Long): UIO[Boolean] = {
-//    val key = buildRoute(uriRoute)
-//    STM.atomically {
-//      for {
-//        subs <- subscriptions
-//        bool <- subs.get(key).flatMap(o => STM.fromOption(o)).map(_.contains(id)).fold(_ => false, identity)
-//        _ <- STM.unless(bool)(subs.merge(key, Set(id))(_ union _))
-//      } yield bool
-//    }
-//  }
-//
-//  /**
-//   * Deletes a single subscriber from the value set of the given key (route). The removal is not applied to sub-routes.
-//   *
-//   * @param uriRoute a split representation of the uri-path
-//   * @param id       the id of the subscriber, used as a key for the hashmap
-//   * @return A Boolean that reflects whether the deletion was successful or not.
-//   */
-//  def deleteSubscriberFrom(uriRoute: NonEmptyChunk[Route], id: Long): UIO[Boolean] = {
-//    val key = buildRoute(uriRoute)
-//    STM.atomically {
-//      for {
-//        subs <- subscriptions
-//        bool <- subs.contains(key)
-//        _ <- STM.when(bool)(subs.merge(key, Set(id))(_ diff _))
-//      } yield bool
-//    }
-//  }
-//
-//  val getAllTopics: UIO[List[Route]] =
-//    subscriptions.flatMap(_.keys).commit
-//
-
-//
-//  private val readSubscribers: Chunk[Route] => UIO[Set[Long]] =
-//    (keys: Chunk[Route]) =>
-//      STM.atomically {
-//        for {
-//          subs <- subscriptions
-//          sets <- STM.foreach(keys)(key => subs.getOrElse(key, Set.empty[Long]))
-//        } yield sets.fold(Set.empty[Long])(_ union _)
-//      }
-//
-//  private val readSubscribersAndWriteTopics: Chunk[Route] => UIO[Set[Long]] =
-//    (keys: Chunk[Route]) =>
-//      STM.atomically {
-//        for {
-//          subs <- subscriptions
-//          sets <- STM.foreach(keys)(key => subs.merge(key, Set[Long]())(_ union _))
-//        } yield sets.fold(Set.empty[Long])(_ union _)
-//      }
-
-//  private def getSubRoutes(uriRoute: NonEmptyChunk[Route]): Chunk[Route] =
-//    uriRoute.scan(Route(""))((acc, c) => Route(acc.asString + c.asString)).drop(1)
-//
-//  private def buildRoute(uriRoute: NonEmptyChunk[Route]): Route =
-//    Route(uriRoute.mkString)
-
-
-
-
-//  def addSubscriber(uriRoute: NonEmptyChunk[Route], id: Long): UIO[Boolean] = {
-//    val key = buildRoute(uriRoute)
-//    STM.atomically {
-//      for {
-//        subs <- subscriptions
-//        bool <- subs.get(key).flatMap(o => STM.fromOption(o)).map(_.contains(id)).fold(_ => false, identity)
-//        _ <- STM.unless(bool)(subs.merge(key, Set(id))(_ union _))
-//      } yield bool
-//    }
-//  }
-
