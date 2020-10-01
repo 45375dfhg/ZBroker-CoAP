@@ -9,7 +9,7 @@ import domain.model.coap._
 import domain.model.coap.header.CoapId
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository.sendMessage
-import zio.{IO, NonEmptyChunk, UIO}
+import zio.{IO, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
 import zio.stream.ZStream

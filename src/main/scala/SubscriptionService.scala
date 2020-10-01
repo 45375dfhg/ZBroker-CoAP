@@ -1,20 +1,16 @@
 
-
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository.BrokerRepository
-import infrastructure.environment.BrokerRepositoryEnvironment
-import io.grpc.protobuf.services.ProtoReflectionService
-import io.grpc.{ServerBuilder, Status}
+
+import io.grpc.Status
 import scalapb.zio_grpc.CanBind.canBindAny
 import scalapb.zio_grpc.{Server, ServerLayer, ServerMain, ServiceList}
+
 import subgrpc.subscription.SubscriptionRequest.Action
 import subgrpc.subscription._
-import zio.console.putStrLn
+
 import zio.stream.{Stream, ZStream}
-import zio.{Has, NonEmptyChunk, Schedule, ZEnv, ZLayer}
-
-import scala.concurrent.duration.Duration
-
+import zio.{Has, NonEmptyChunk, ZEnv, ZLayer}
 
 class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with BrokerRepository, Any] {
   import SubscriptionService._
@@ -22,46 +18,21 @@ class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with
   override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository, Status, PublisherResponse] = {
 
     ZStream.fromEffect(BrokerRepository.getNextId).flatMap { id =>
-      ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL.withDescription(id.toString), q => ZStream.fromTQueue(q)))
-        .zipLeft {
+      ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL, q => ZStream.fromTQueue(q)))
+        .drainFork {
           for {
             _ <- request
-              .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
-              // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
-              .tap { case (action, paths) => action match {
-                case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
-                case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
-              }
-              }
+                  .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
+                  // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
+                  .tap { case (action, paths) => action match {
+                    case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
+                    case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
+                  }
+                }
           } yield ()
         }
     }
-
-//      for {
-//        _ <- request
-//          .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
-//          // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
-//          .tap { case (action, paths) => action match {
-//            case Action.ADD => putStrLn("fuck") *> BrokerRepository.addSubscriberTo(paths, id)
-//            case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
-//          }
-//          }
-//      } yield ()
-//    }
-
-//      request
-//        .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
-//        // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
-//        .tap { case (action, paths) => action match {
-//            case Action.ADD    => putStrLn("fuck") *> BrokerRepository.addSubscriberTo(paths, id)
-//            case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
-//          }
-//        }
-//        .zipRight(ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL.withDescription(id.toString), ZStream.fromTQueue)))
-//    } // ZStream.fromIterable(Seq(PublisherResponse(None))) //.repeatElements(Schedule.forever)
-//
   }
-
 }
 
 object SubscriptionService {
