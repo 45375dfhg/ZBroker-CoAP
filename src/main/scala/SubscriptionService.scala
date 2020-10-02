@@ -26,7 +26,7 @@ class SubscriptionService extends ZioSubscription.ZSubscriptionService[ZEnv with
                   // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
                   .tap { case (action, paths) => action match {
                     case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
-                    case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id)
+                    case Action.REMOVE => BrokerRepository.removeSubscriber(paths, id) // TODO: ADD
                   }
                 }
           } yield ()
