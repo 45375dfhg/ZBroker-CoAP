@@ -2,7 +2,6 @@
 import infrastructure.environment._
 
 import zio._
-import zio.console._
 
 
 object Main extends App {
@@ -14,7 +13,7 @@ object Main extends App {
       (ChunkStreamRepositoryEnvironment.fromSocket ++
         MessageSenderRepositoryEnvironment.fromSocket)
 
-  def run(args: List[String]): URIO[ZEnv with Console, ExitCode] =
+  def run(args: List[String]): URIO[ZEnv, ExitCode] =
     program.provideCustomLayer(partialLayer).orDie.exitCode
 
 }

@@ -27,14 +27,13 @@ object Program {
     ChunkStreamRepository
       .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
 
-      // TODO: COLLECT DOES NOT WORK HERE
       (UIO.succeed(address) <*> extractFromChunk(chunk))
         .collect(PartialFnMismatch)(messagesAndErrorsWithId).tap(sendReset)
         .collect(PartialFnMismatch)(validMessage).tap(sendAcknowledgment)
         .map(isolateMessage).collect(PartialFnMismatch) {
-          case t @ CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
-        }
-        .tap(pushViableMessage)
+        case t@CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
+      }
+        .tap(pushViableMessage).ignore
 
     }.runDrain
 
