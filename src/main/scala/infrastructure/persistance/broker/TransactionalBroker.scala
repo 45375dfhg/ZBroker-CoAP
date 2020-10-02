@@ -12,16 +12,18 @@ import zio._
 /**
  * A broker which handles topics and subscribers. Topics are paired with their subscribers and
  * each subscriber has its own mail system which is a queue.
- * @param buckets A thread-safe bucket system for each incoming connection represented as a
- *                Long where the connection is paired with its own queue to push messages into.
- * @param subscriptions A thread-safe subscriber system where the key represents a topic and
+ * @param mailboxes A thread-safe bucket system for each incoming connection represented as a
+ *                  Long where the connection is paired with its own queue to push messages into.
+ * @param subscriptions A thread-safe subscription system where the key represents a topic and
  *                      its subscribers are saved inside the paired Set. A subscriber is
  *                      identified by its unique Long value.
+ * @param subscribers A TMap which maps each Subscriber to a Set of its subscribed topics
  * @param counter A thread-safe counter that acts as supplier for unique connection ID's.
  */
 class TransactionalBroker (
-  val buckets: TMap[Long, TQueue[PublisherResponse]],
+  val mailboxes: TMap[Long, TQueue[PublisherResponse]],
   val subscriptions: TMap[String, Set[Long]],
+  val subscribers: TMap[Long, Set[String]],
   val counter: TRef[Long]
 ) extends BrokerRepository.Service {
 
@@ -32,38 +34,39 @@ class TransactionalBroker (
 
   /**
    * Maps a new subscriber to one or multiple topics.
+   * Additionally, all new subscriptions are mapped to the subscriber.
    * @param topics A sequence of topics that the user wants to subscribe to.
    * @param id The connection id of the user.
    */
   def addSubscriberTo(topics: Paths, id: Long): UIO[Unit] =
     STM.atomically {
       for {
-        _    <- STM.unlessM(buckets.contains(id))(TQueue.unbounded[PublisherResponse] >>= (buckets.put(id, _)))
+        _    <- STM.unlessM(mailboxes.contains(id))(TQueue.unbounded[PublisherResponse] >>= (mailboxes.put(id, _)))
         keys =  topics.map(path => TransactionalBroker.buildRoute(path))
+        _    <- subscribers.merge(id, keys.toSet)(_ union _)
         _    <- STM.foreach_(keys)(key => subscriptions.merge(key, Set(id))(_ union _))
       } yield ()
     }
 
-  // TODO: REWRITE THIS PROPERLY TO AN EITHER
-  def getSubscribers(topic: String): UIO[Set[Long]] =
-    STM.atomically {
-      for {
-        r <- subscriptions.getOrElse(topic, Set(666L))
-      } yield r
-    }
+  /**
+   * Attempts to retrieve the subscribers from a singular topic
+   * @return An Option of the Set of said topic's subscribers
+   */
+  def getSubscribers(topic: String): UIO[Option[Set[Long]]] =
+    subscriptions.get(topic).commit
 
   /**
-   * Attempts the mailbox (a queue) mapped to the specified ID.
-   * WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
+   * Attempts to get the mailbox (a queue) mapped to the specified ID.
+   * TODO: WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */
   def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]] = {
     STM.atomically {
       for {
-        bool  <- buckets.contains(id)
+        bool  <- mailboxes.contains(id)
         _     <- if (bool) STM.unit else STM.retry
-        queue <- buckets.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)
+        queue <- mailboxes.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)
       } yield queue
     }
   }
@@ -83,7 +86,7 @@ class TransactionalBroker (
         set    <- STM.foreach(routes)(route => subscriptions.getOrElse(route, Set.empty[Long])).map(_.reduce(_ union _))
         _      <- STM.foreach_(set) { key =>
                     for {
-                      queueM <- buckets.get(key)
+                      queueM <- mailboxes.get(key)
                       queue  <- queueM.fold(TQueue.unbounded[PublisherResponse])(STM.succeed(_))
                       _      <- queue.offer(msg)
                     } yield ()
@@ -102,38 +105,46 @@ class TransactionalBroker (
       } yield ()
     }
 
-  /**TODO: WARNING: NOT A FINAL IMPLEMENTATION! THIS WILL LEAD TO INCONSISTENT BEHAVIOUR AND FRAGMENTS!
-   * Removes a subscriber by its ID from one or more topics.
-   * @param topics A sequence of topics
+  /**
+   * Removes a subscriber by its ID from all its subscribed topics and deletes its mailbox.
+   * <p>
+   * WARNING: Technically, a queue should be deleted by its consumer. Yet, this is NOT checked!
    * @param id The unique ID of a subscriber
    */
-  def removeSubscriber(topics: Paths, id: Long): UIO[Unit] =
+  def removeSubscriber(id: Long): UIO[Unit] =
     STM.atomically {
       for {
-        keys <- STM.succeed(topics.map(path => TransactionalBroker.buildRoute(path)))
-        _    <- STM.foreach_(keys) { key =>
-                  STM.whenM(subscriptions.get(key).map(_.fold(false)(_.contains(id)))) {
-                    subscriptions.merge(key, Set(id))(_ diff _)
-                  }
-                }
+        topics <- subscribers.get(id) >>= STM.fromOption
+        _      <- STM.foreach_(topics)(topic => subscriptions.merge(topic, Set(id))(_ diff _))
+        _      <- mailboxes.delete(id)
       } yield ()
     }
 }
 
 object TransactionalBroker {
 
+  /**
+   * Takes the segments which make up a path and returns their sub-routes.
+   */
   private def getSubRoutesFrom(segments: Segments): Seq[String] =
     segments.scanLeft("")(_ + _).tail
 
+  /**
+   * Takes segments which make up a path and returns the complete path as a String.
+   */
   private def buildRoute(uriPath: Segments): String =
     uriPath.mkString
 
+  /**
+   * Creates a STM of a TransactionalBroker.
+   */
   def make: STM[Nothing, TransactionalBroker] =
     for {
       buckets <- TMap.empty[Long, TQueue[PublisherResponse]]
-      subs    <- TMap.empty[String, Set[Long]]
+      topics  <- TMap.empty[String, Set[Long]]
+      subs    <- TMap.empty[Long, Set[String]]
       counter <- TRef.make(0L)
-      repo    =  new TransactionalBroker(buckets, subs, counter)
+      repo    =  new TransactionalBroker(buckets, topics, subs, counter)
     } yield repo
 
 }

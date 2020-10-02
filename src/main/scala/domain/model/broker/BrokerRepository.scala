@@ -16,8 +16,8 @@ object BrokerRepository {
     def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]]
     def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit]
     def addSubscriberTo(topics: Paths, id: Long): UIO[Unit]
-    def removeSubscriber(topics: Paths, id: Long): UIO[Unit]
-    def getSubscribers(topic: String): UIO[Set[Long]]
+    def removeSubscriber(id: Long): UIO[Unit]
+    def getSubscribers(topic: String): UIO[Option[Set[Long]]]
 
     val getNextId: UIO[Long]
   }
@@ -43,10 +43,10 @@ object BrokerRepository {
   def addSubscriberTo(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
     ZIO.accessM(_.get.addSubscriberTo(topics, id))
 
-  def removeSubscriber(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
-    ZIO.accessM(_.get.removeSubscriber(topics, id))
+  def removeSubscriber(id: Long): URIO[BrokerRepository, Unit] =
+    ZIO.accessM(_.get.removeSubscriber(id))
 
-  def getSubscribers(topic: String): URIO[BrokerRepository, Set[Long]] =
+  def getSubscribers(topic: String): URIO[BrokerRepository, Option[Set[Long]]] =
     ZIO.accessM(_.get.getSubscribers(topic))
 
   val getNextId: URIO[BrokerRepository, Long] =
