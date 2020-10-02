@@ -1,19 +1,18 @@
 package domain.model.coap
 
-import java.nio.ByteBuffer
-
 import option._
-import zio.IO
 
 import io.estatico.newtype.macros.newtype
 import io.estatico.newtype.ops._
 
+import zio._
 import zio.Chunk
 
-
-import utility.ChunkExtension.ChunkExtension
+import utility.ChunkExtension._
 
 import scala.collection.immutable.HashMap
+
+import java.nio.ByteBuffer
 
 
 final case class CoapOption(

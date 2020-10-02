@@ -5,7 +5,9 @@ import domain.model.coap.header._
 import domain.model.coap.option._
 
 import Numeric.Implicits._
+
 import utility.ChunkExtension._
+
 import zio.{Chunk, IO, UIO, URIO}
 
 

@@ -1,18 +1,25 @@
 
 import Controller._
-import domain.api.CoapDeserializerService.{IgnoredMessageWithId, IgnoredMessageWithIdOption, extractFromChunk}
+
+import domain.api.CoapDeserializerService.{IgnoredMessageWithId, IgnoredMessageWithIdOption}
 import domain.api.ResponseService.getAcknowledgment
 import domain.api._
-import domain.model.broker.BrokerRepository
-import domain.model.chunkstream.ChunkStreamRepository
+
+import domain.model.broker._
+import domain.model.chunkstream._
 import domain.model.coap._
-import domain.model.coap.header.CoapId
+import domain.model.coap.header._
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository.sendMessage
+
+import subgrpc.subscription.PublisherResponse
+
 import zio.{IO, UIO}
 import zio.console._
 import zio.nio.core.SocketAddress
-import zio.stream.ZStream
+import zio.stream._
+
+import utility.PublisherResponseExtension._
 
 object Controller {
   val boot = putStrLn("The application is starting. Settings need to be configured.")
@@ -27,7 +34,7 @@ object Program {
     ChunkStreamRepository
       .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
 
-      (UIO.succeed(address) <*> extractFromChunk(chunk))
+      (UIO.succeed(address) <*> CoapMessage.fromChunk(chunk))
         .collect(PartialFnMismatch)(messagesAndErrorsWithId).tap(sendReset)
         .collect(PartialFnMismatch)(validMessage).tap(sendAcknowledgment)
         .map(isolateMessage).collect(PartialFnMismatch) {
@@ -41,7 +48,7 @@ object Program {
     (for {
       route   <- m.getPath
       content <- m.getContent
-      _       <- BrokerRepository.pushMessageTo(route, m.toPublisherResponseWith(route, content))
+      _       <- BrokerRepository.pushMessageTo(route, PublisherResponse.from(route, content))
     } yield ()).orElseSucceed(())
   }
 

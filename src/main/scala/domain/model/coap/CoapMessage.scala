@@ -1,10 +1,11 @@
 package domain.model.coap
 
+import domain.api.CoapDeserializerService
 import domain.model.coap.header.CoapId
 import domain.model.coap.option.StringCoapOptionValueContent
 import domain.model.exception._
 import subgrpc.subscription.{Path, PublisherResponse}
-import zio.{IO, NonEmptyChunk}
+import zio.{Chunk, IO, NonEmptyChunk, UIO}
 
 final case class CoapMessage(header: CoapHeader, body: CoapBody) {
 
@@ -14,10 +15,11 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   val getPath: IO[SuccessfulFailure, NonEmptyChunk[String]] = {
     this.body.options match {
       case Some(optionChunk) =>
-        val routes = optionChunk.collect {
-          case option if option.number.value == 11 => option.optValue.content
-        }.collect {
-          case StringCoapOptionValueContent(value) => value
+        val routes = optionChunk
+           .collect {
+            case option if option.number.value == 11 => option.optValue.content
+          }.collect {
+           case StringCoapOptionValueContent(value) => value
         }
         IO.fromOption(NonEmptyChunk.fromChunk(routes)).orElseFail(MissingRoutes)
       case None => IO.fail(MissingOptions)
@@ -37,8 +39,7 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
   val toPublisherResponse: IO[SuccessfulFailure, PublisherResponse] =
     (getPath <*> getContent).map { case (route, content) => toPublisherResponseWith(route, content) }
 
-  // TODO: should neither be part of the case class nor the companion object
-  def toPublisherResponseWith(route: NonEmptyChunk[String], content: String) =
+  private def toPublisherResponseWith(route: NonEmptyChunk[String], content: String) =
     PublisherResponse(Some(Path(route.toSeq)), content)
 
 }
@@ -46,6 +47,9 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
 object CoapMessage {
   def reset(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
   def ack  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
+
+  def fromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
+    CoapDeserializerService.extractFromChunk(chunk)
 }
 
 
