@@ -8,6 +8,7 @@ import domain.model.exception.GatewayError
 import zio.IO
 
 package object BufferModel {
+
   sealed trait BufferSizeException extends GatewayError
   final case class UnexpectedBufferSizeException(err: String) extends BufferSizeException {
     override def msg: String = err

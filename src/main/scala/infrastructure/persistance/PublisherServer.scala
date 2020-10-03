@@ -1,49 +1,43 @@
-
-import Controller._
+package infrastructure.persistance
 
 import domain.api.CoapDeserializerService.{IgnoredMessageWithId, IgnoredMessageWithIdOption}
 import domain.api.ResponseService.getAcknowledgment
 import domain.api._
-
 import domain.model.broker._
 import domain.model.chunkstream._
 import domain.model.coap._
 import domain.model.coap.header._
+import domain.model.config.ConfigRepository
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository.sendMessage
-
+import infrastructure.persistance.Controller.boot
 import subgrpc.subscription.PublisherResponse
-
-import zio.{IO, UIO}
+import utility.PublisherResponseExtension._
 import zio.console._
 import zio.nio.core.SocketAddress
 import zio.stream._
+import zio.{IO, UIO}
 
-import utility.PublisherResponseExtension._
 
-object Controller {
-  val boot = putStrLn("The application is starting. Settings need to be configured.")
-}
 
-object Program {
+object PublisherServer {
 
-  // TODO: Implement some config logic for manual setup
-  val start = ZStream.fromEffect(boot)
+  val make = {
+    for {
+      n <- ConfigRepository.getStreamFiberAmount
 
-  val coapStream =
-    ChunkStreamRepository
-      .getChunkStream.mapMParUnordered(Int.MaxValue) { case (address, chunk) =>
-
+    } yield ()
+    ChunkStreamRepository.getChunkStream.mapMParUnordered() { case (address, chunk) =>
       (UIO.succeed(address) <*> CoapMessage.fromChunk(chunk))
-        .collect(PartialFnMismatch)(messagesAndErrorsWithId).tap(sendReset)
-        .collect(PartialFnMismatch)(validMessage).tap(sendAcknowledgment)
-        .map(isolateMessage).collect(PartialFnMismatch) {
-        case t@CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
-      }
-        .tap(pushViableMessage).ignore
-
+        .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
+        .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment)
+        .map(isolateMessage).collect(UnsharablePayload)(viableMessage)
+        .tap(pushViableMessage)
+        .ignore
     }.runDrain
+  }
 
+  // TODO - all these send and push messages are somehow part of a service or two - not part of the server mode itself!
   private def pushViableMessage(m: CoapMessage) = {
     (for {
       route   <- m.getPath
@@ -60,6 +54,10 @@ object Program {
           (tuple => sendMessage(tuple._1, tuple._2))
       }.either
     }
+  }
+
+  private def viableMessage: PartialValidMessage = {
+    case t @ CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => t
   }
 
   private def isolateMessage(tuple: (Option[SocketAddress], CoapMessage)) =
@@ -83,6 +81,8 @@ object Program {
     case (address, Right(value))                    => (address, Right(value))
     case (address, Left((err, id))) if id.isDefined => (address, Left(err, id.get))
   }
+
+  type PartialValidMessage = PartialFunction[CoapMessage, CoapMessage]
 
   type PartialGatherMessages = PartialFunction[(Option[SocketAddress], Either[IgnoredMessageWithId, CoapMessage]),
     (Option[SocketAddress], CoapMessage)]

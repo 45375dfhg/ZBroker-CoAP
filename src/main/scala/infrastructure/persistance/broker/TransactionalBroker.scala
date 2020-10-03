@@ -59,8 +59,9 @@ class TransactionalBroker (
 
   /**
    * Attempts to get the mailbox (a queue) mapped to the specified ID.
+   * <p>
    * TODO: WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
-   *
+   * <p>
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */
@@ -122,9 +123,9 @@ class TransactionalBroker (
         topics <- subscribers.get(id) >>= STM.fromOption
         _      <- STM.foreach_(topics)(topic => subscriptions.merge(topic, Set(id))(_ diff _))
         _      <- mailboxes.delete(id)
+        _      <- subscribers.delete(id)
       } yield ()
     }
-
 
   /**
    * Removes one or many subscriptions of a given subscriber but does NOT delete its mailbox

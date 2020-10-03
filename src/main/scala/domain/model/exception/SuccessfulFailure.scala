@@ -8,6 +8,10 @@ case object NoResponseAvailable extends SuccessfulFailure {
   override def msg = "This message does not require a response"
 }
 
+case object InvalidCoapMessage extends SuccessfulFailure {
+  override def msg = "The parsing of the datagram was unsuccessful."
+}
+
 case object MissingCoapId extends SuccessfulFailure {
   override def msg = "The message is not valid and contains no ID."
 }
@@ -30,4 +34,8 @@ case object MissingPayload extends SuccessfulFailure {
 
 case object UnsupportedPayload extends SuccessfulFailure {
   override def msg = "Payload format is not supported."
+}
+
+case object UnsharablePayload extends SuccessfulFailure {
+  override def msg = "The message is not meant to be shared."
 }

@@ -1,6 +1,7 @@
 package domain.model.config
 
 import domain.model.BufferModel._
+import domain.model.FiberModel._
 import domain.model.PortModel._
 import zio._
 
@@ -12,6 +13,7 @@ object ConfigRepository {
     def getPrimaryUDPPort: IO[PortRangeException, Port]
     def getInwardBufferSize: IO[BufferSizeException, BufferSize]
     def getOutwardBufferSize: IO[BufferSizeException, BufferSize]
+    def getStreamFiberAmount: IO[FiberNumberException, FiberNumber]
   }
 
   def getPrimaryUDPPort: ZIO[ConfigRepository, PortRangeException, Port] =
@@ -22,4 +24,7 @@ object ConfigRepository {
 
   def getOutwardBufferSize: ZIO[ConfigRepository, BufferSizeException, BufferSize] =
     ZIO.accessM(_.get.getOutwardBufferSize)
+
+  def getStreamFiberAmount: ZIO[ConfigRepository, FiberNumberException, FiberNumber] =
+    ZIO.accessM(_.get.getStreamFiberAmount)
 }

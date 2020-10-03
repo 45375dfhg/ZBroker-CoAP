@@ -8,10 +8,3 @@ case object MissingBrokerBucket extends UnexpectedError {
 
   def msg: String = "WARNING: A bucket returned no value. The broker is inconsistent."
 }
-
-case object PartialFnMismatch extends UnexpectedError {
-
-  type PartialFnMismatch = PartialFnMismatch.type
-
-  def msg: String = "WARNING: Partial Function was not properly matched. System critical error."
-}
