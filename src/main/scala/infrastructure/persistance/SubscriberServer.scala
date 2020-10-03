@@ -2,26 +2,26 @@ package infrastructure.persistance
 
 
 import domain.api.SubscriptionService
-import domain.model.broker.BrokerRepository.BrokerRepository
+import domain.model.broker.BrokerRepository._
+
+import io.grpc.ServerBuilder
 
 import scalapb.zio_grpc.CanBind.canBindAny
-import scalapb.zio_grpc.{Server, ServerLayer, ServerMain, ServiceList}
+import scalapb.zio_grpc._
 
-import zio.{Has, ZEnv, ZLayer}
+import zio._
 
-object SubscriberServer extends ServerMain {
+object SubscriberServer {
 
-  override def port = 8980
+  def port = 8980 // TODO: Needs to be part of the config
 
   def subscriptionService = new SubscriptionService()
 
   def service: ServiceList[ZEnv with BrokerRepository] = ServiceList.add(subscriptionService)
 
-  override def builder = super.builder
+  def builder: ServerBuilder[_] = ServerBuilder.forPort(8980)
 
   def live: ZLayer[ZEnv with BrokerRepository, Throwable, Has[Server.Service]] = ServerLayer.fromServiceList(builder, service)
 
-  val make = welcome *> live.build.useForever
-
-  override def services = ???
+  val make = live.build.useForever
 }

@@ -1,14 +1,14 @@
 package infrastructure.persistance.chunkstream
 
-import domain.model.config.ConfigRepository
-import domain.model.config.ConfigRepository.ConfigRepository
-import domain.model.chunkstream.ChunkStreamRepository
+import domain.model.config._
+import domain.model.config.ConfigRepository._
+import domain.model.chunkstream._
+import domain.model.exception._
 
-import domain.model.exception.GatewayError
-import zio.{Chunk, Has, ZIO}
-import zio.nio.core.channels.DatagramChannel
-import zio.nio.core.{Buffer, SocketAddress}
-import zio.stream.ZStream
+import zio._
+import zio.nio.core.channels._
+import zio.nio.core._
+import zio.stream._
 
 object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
 

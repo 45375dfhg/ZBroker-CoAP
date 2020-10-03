@@ -1,10 +1,26 @@
 package infrastructure.persistance
 
-import zio.console._
+import domain.model.config.ConfigRepository
+import infrastructure.environment._
+import zio._
+import zio.console.putStrLn
 
-// TODO: SETUP!
-// runtime args need to be able to skip this and load from memory!
 object Controller {
 
-  val boot = putStrLn("The application is starting. Settings need to be configured.")
+  def boot(args: List[String]) = {
+    val profile = args.headOption.fold("")(identity)
+
+    if (profile == "memory") putStrLn("what").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromMemory)
+    else putStrLn("what").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromConsole)
+  }
+
+  /**
+   * Constructs an environment where the only missing part of the layer is a ConfigRepository.Service.
+   * Said layer is provided as parameter.
+   */
+  def getEnvironment(config: ULayer[Has[ConfigRepository.Service]]) =
+    BrokerRepositoryEnvironment.fromSTM ++
+      (config >+> EndpointEnvironment.fromChannel) >+>
+      (ChunkStreamRepositoryEnvironment.fromSocket ++ MessageSenderRepositoryEnvironment.fromSocket)
+
 }

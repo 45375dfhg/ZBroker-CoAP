@@ -2,8 +2,9 @@ package infrastructure.persistance.broker
 
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository._
-import domain.model.exception.MissingBrokerBucket
+import domain.model.exception.{MissingBrokerBucket, MissingSubscriber}
 import domain.model.exception.MissingBrokerBucket._
+import domain.model.exception.MissingSubscriber.MissingSubscriber
 import infrastructure.persistance.broker.TransactionalBroker.getPathFromSegments
 import subgrpc.subscription.PublisherResponse
 import zio.stm._
@@ -117,10 +118,10 @@ class TransactionalBroker (
    *
    * @param id The unique ID of a subscriber
    */
-  def removeSubscriber(id: Long): UIO[Unit] =
+  def removeSubscriber(id: Long): IO[MissingSubscriber, Unit] =
     STM.atomically {
       for {
-        topics <- subscribers.get(id) >>= STM.fromOption
+        topics <- subscribers.get(id) >>= (o => STM.fromOption(o).mapError(_ => MissingSubscriber))
         _      <- STM.foreach_(topics)(topic => subscriptions.merge(topic, Set(id))(_ diff _))
         _      <- mailboxes.delete(id)
         _      <- subscribers.delete(id)
@@ -133,7 +134,7 @@ class TransactionalBroker (
    * @param topics A NonEmptyChunk of NonEmptyChunks were each sub-chunk contains a topic in a segmented form.
    * @param id The id of the subscriber that wants to delete some subscriptions of itself.
    */
-  def removeSubscriptions(topics: Paths, id: Long): UIO[Unit] =
+  def removeSubscriptions(topics: Paths, id: Long): UIO[Unit] = // TODO: THIS CAN FAIL!?
     STM.atomically {
       for {
         paths <- STM.succeed(topics.map(getPathFromSegments))
