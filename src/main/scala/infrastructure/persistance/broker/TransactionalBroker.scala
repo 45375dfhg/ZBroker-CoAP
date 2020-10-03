@@ -134,7 +134,7 @@ class TransactionalBroker (
    * @param topics A NonEmptyChunk of NonEmptyChunks were each sub-chunk contains a topic in a segmented form.
    * @param id The id of the subscriber that wants to delete some subscriptions of itself.
    */
-  def removeSubscriptions(topics: Paths, id: Long): UIO[Unit] = // TODO: THIS CAN FAIL!?
+  def removeSubscriptions(topics: Paths, id: Long): UIO[Unit] =
     STM.atomically {
       for {
         paths <- STM.succeed(topics.map(getPathFromSegments))
