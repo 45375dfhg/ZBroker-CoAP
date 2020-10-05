@@ -10,8 +10,11 @@ object Controller {
   def boot(args: List[String]) = {
     val profile = args.headOption.fold("")(identity)
 
-    if (profile == "memory") putStrLn("what").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromMemory)
-    else putStrLn("what").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromConsole)
+    putStrLn("[Config] Applying config from memory. Pass 'console' as an argument to set config manually.").toLayer ++
+      getEnvironment(ConfigRepositoryEnvironment.fromMemory)
+
+//    if (profile != "console") putStrLn("[Config] Applying config from memory. Pass 'console' as an argument to set manually").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromMemory)
+//    else putStrLn("[Config] Applying config from console input ...").toLayer ++ getEnvironment(ConfigRepositoryEnvironment.fromConsole)
   }
 
   /**

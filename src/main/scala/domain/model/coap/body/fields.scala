@@ -1,38 +1,21 @@
-package domain.model.coap
-
-import option._
-
-import io.estatico.newtype.macros.newtype
-import io.estatico.newtype.ops._
-
-import zio._
-import zio.Chunk
-
-import utility.ChunkExtension._
-
-import scala.collection.immutable.HashMap
+package domain.model.coap.body
 
 import java.nio.ByteBuffer
 
+import domain.model.exception.{InvalidCoapOptionNumber, InvalidOptionDelta, InvalidOptionLength, MessageFormatError}
+import io.estatico.newtype.macros.newtype
+import zio.{Chunk, IO}
 
-final case class CoapOption(
-  delta    : CoapOptionDelta,
-  exDelta  : Option[CoapOptionExtendedDelta],
-  length   : CoapOptionLength,
-  exLength : Option[CoapOptionExtendedLength],
-  number   : CoapOptionNumber,
-  optValue : CoapOptionValue,
-  offset   : CoapOptionOffset
-)
+import scala.collection.immutable.HashMap
 
-package object option {
+package object fields {
 
   @newtype class CoapOptionDelta private(val value: Int)
 
   object CoapOptionDelta {
     def apply(value: Int): IO[MessageFormatError, CoapOptionDelta] =
-      // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-      // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
       IO.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
   }
 
@@ -40,8 +23,8 @@ package object option {
 
   object CoapOptionExtendedDelta {
     def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedDelta] =
-      // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
-      // The extension value must be greater than 12 which is a highest non special construct value.
+    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
+    // The extension value must be greater than 12 which is a highest non special construct value.
       IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
   }
 
@@ -60,8 +43,8 @@ package object option {
 
   object CoapOptionExtendedLength {
     def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedLength] =
-      // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
-      // The extension value must be greater than 12 which is a highest non special construct value.
+    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
+    // The extension value must be greater than 12 which is a highest non special construct value.
       IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
   }
 
@@ -108,43 +91,43 @@ package object option {
 
     // https://tools.ietf.org/html/rfc7959#section-2.1
     private val format: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
-      1  -> (OpaqueOptionValueFormat, 0 to 8),
-      3  -> (StringOptionValueFormat, 1 to 255),
-      4  -> (OpaqueOptionValueFormat, 1 to 8),
-      5  -> (EmptyOptionValueFormat,  0 to 0),
-      7  -> (IntOptionValueFormat,    0 to 2),
-      8  -> (StringOptionValueFormat, 0 to 255),
+      1 -> (OpaqueOptionValueFormat, 0 to 8),
+      3 -> (StringOptionValueFormat, 1 to 255),
+      4 -> (OpaqueOptionValueFormat, 1 to 8),
+      5 -> (EmptyOptionValueFormat, 0 to 0),
+      7 -> (IntOptionValueFormat, 0 to 2),
+      8 -> (StringOptionValueFormat, 0 to 255),
       11 -> (StringOptionValueFormat, 0 to 255),
-      12 -> (IntOptionValueFormat,    0 to 2),
-      14 -> (IntOptionValueFormat,    0 to 4),
+      12 -> (IntOptionValueFormat, 0 to 2),
+      14 -> (IntOptionValueFormat, 0 to 4),
       15 -> (StringOptionValueFormat, 0 to 255),
-      17 -> (IntOptionValueFormat,    0 to 2),
+      17 -> (IntOptionValueFormat, 0 to 2),
       20 -> (StringOptionValueFormat, 0 to 255),
-      23 -> (IntOptionValueFormat,    0 to 3),
-      27 -> (IntOptionValueFormat,    0 to 3),
+      23 -> (IntOptionValueFormat, 0 to 3),
+      27 -> (IntOptionValueFormat, 0 to 3),
       35 -> (StringOptionValueFormat, 1 to 1034),
       39 -> (StringOptionValueFormat, 1 to 255),
-      60 -> (IntOptionValueFormat,    0 to 4)
+      60 -> (IntOptionValueFormat, 0 to 4)
     )
 
     private val properties = HashMap(
-      1  -> (true,  false, false, true),
-      3  -> (true,  true,  false, false),
-      4  -> (false, false, false, true),
-      5  -> (true,  false, false, true),
-      7  -> (true,  true,  false, false),
-      8  -> (false, false, false, true),
-      11 -> (true,  true,  false, true),
+      1 -> (true, false, false, true),
+      3 -> (true, true, false, false),
+      4 -> (false, false, false, true),
+      5 -> (true, false, false, true),
+      7 -> (true, true, false, false),
+      8 -> (false, false, false, true),
+      11 -> (true, true, false, true),
       12 -> (false, false, false, false),
-      14 -> (false, true,  false, false),
-      15 -> (true,  true,  false, true),
-      17 -> (true,  false, false, false),
+      14 -> (false, true, false, false),
+      15 -> (true, true, false, true),
+      17 -> (true, false, false, false),
       20 -> (false, false, false, true),
-      23 -> (true,  true,  false, false),
-      27 -> (true,  true,  false, false),
-      35 -> (true,  true,  false, false),
-      39 -> (true,  true,  false, false),
-      60 -> (false, false, true,  true)
+      23 -> (true, true, false, false),
+      27 -> (true, true, false, false),
+      35 -> (true, true, false, false),
+      39 -> (true, true, false, false),
+      60 -> (false, false, true, true)
     )
 
     private val numbers = format.keySet
@@ -155,21 +138,27 @@ package object option {
 
   sealed trait CoapOptionValueFormat {
     def transform(raw: Chunk[Byte], range: Range): CoapOptionValueContent = this match {
-      case IntOptionValueFormat    => IntCoapOptionValueContent(raw, range)
+      case IntOptionValueFormat => IntCoapOptionValueContent(raw, range)
       case StringOptionValueFormat => StringCoapOptionValueContent(raw, range)
       case OpaqueOptionValueFormat => OpaqueCoapOptionValueContent(raw, range)
-      case EmptyOptionValueFormat  => EmptyCoapOptionValueContent
+      case EmptyOptionValueFormat => EmptyCoapOptionValueContent
     }
   }
-  case object IntOptionValueFormat          extends CoapOptionValueFormat
-  case object StringOptionValueFormat       extends CoapOptionValueFormat
-  case object OpaqueOptionValueFormat       extends CoapOptionValueFormat
-  case object EmptyOptionValueFormat        extends CoapOptionValueFormat
+
+  case object IntOptionValueFormat extends CoapOptionValueFormat
+
+  case object StringOptionValueFormat extends CoapOptionValueFormat
+
+  case object OpaqueOptionValueFormat extends CoapOptionValueFormat
+
+  case object EmptyOptionValueFormat extends CoapOptionValueFormat
 
 
   sealed trait CoapOptionValueContent
-  case object UnrecognizedValueContent          extends CoapOptionValueContent
-  case object EmptyCoapOptionValueContent       extends CoapOptionValueContent
+
+  case object UnrecognizedValueContent extends CoapOptionValueContent
+
+  case object EmptyCoapOptionValueContent extends CoapOptionValueContent
 
   final case class IntCoapOptionValueContent private(value: Int) extends CoapOptionValueContent
 
@@ -199,7 +188,11 @@ package object option {
   }
 
   @newtype case class Critical(value: Boolean)
+
   @newtype case class Unsafe(value: Boolean)
+
   @newtype case class NoCacheKey(value: Boolean)
+
   @newtype case class Repeatable(value: Boolean)
+
 }

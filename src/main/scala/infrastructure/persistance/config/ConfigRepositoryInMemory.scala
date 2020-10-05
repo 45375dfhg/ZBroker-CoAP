@@ -12,7 +12,5 @@ object ConfigRepositoryInMemory extends ConfigRepository.Service {
 
   override def getInwardBufferSize: IO[BufferSizeException, BufferSize] = BufferSize(100)
 
-  override def getOutwardBufferSize: IO[BufferSizeException, BufferSize] = BufferSize(100)
-
   override def getStreamFiberAmount: IO[FiberNumberException, FiberNumber] = FiberNumber(16)
 }

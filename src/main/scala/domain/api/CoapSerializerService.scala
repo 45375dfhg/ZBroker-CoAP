@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import domain.model.coap._
+import domain.model.coap.body.{CoapBody, CoapOption, CoapPayload, TextCoapPayload}
 import domain.model.coap.header._
 import domain.model.coap.option._
 import utility.Extractor
@@ -28,9 +29,9 @@ object CoapSerializerService {
    * Their prepend complexity is 0(1).
    */
   private def generateHeader(head: CoapHeader): Chunk[Byte] = {
-    (((head.version.value << 6) + (head.msgType.value << 4) + head.tLength.value) +:
-      ((head.cPrefix.value << 5) + head.cSuffix.value) +:
-        generateMessageId(head.msgID)).map(_.toByte)
+    (((head.coapVersion.value << 6) + (head.coapType.value << 4) + head.coapTokenLength.value) +:
+      ((head.coapCodePrefix.value << 5) + head.coapCodeSuffix.value) +:
+        generateMessageId(head.coapId)).map(_.toByte)
   }
 
   // TODO: WARNING: TOKEN MODEL NOT DONE AS OF NOW

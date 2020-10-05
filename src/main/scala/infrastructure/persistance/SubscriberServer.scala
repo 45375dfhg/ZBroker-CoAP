@@ -3,13 +3,11 @@ package infrastructure.persistance
 
 import domain.api.SubscriptionService
 import domain.model.broker.BrokerRepository._
-
 import io.grpc.ServerBuilder
-
 import scalapb.zio_grpc.CanBind.canBindAny
 import scalapb.zio_grpc._
-
 import zio._
+import zio.console.putStrLn
 
 object SubscriberServer {
 
@@ -23,5 +21,5 @@ object SubscriberServer {
 
   def live: ZLayer[ZEnv with BrokerRepository, Throwable, Has[Server.Service]] = ServerLayer.fromServiceList(builder, service)
 
-  val make = live.build.useForever
+  val make = putStrLn("[SUB] SubscriberServer loading config. Starting ...") *> live.build.useForever
 }

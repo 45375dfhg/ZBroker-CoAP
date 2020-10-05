@@ -1,21 +1,23 @@
 package domain.model.coap
 
 import domain.api.CoapDeserializerService
-import domain.model.coap.header.CoapId
-import domain.model.coap.option.StringCoapOptionValueContent
+import domain.model.coap.body._
+import domain.model.coap.body.fields._
+import domain.model.coap.header._
 import domain.model.exception._
-import subgrpc.subscription.{Path, PublisherResponse}
-import zio.{Chunk, IO, NonEmptyChunk, UIO}
+import subgrpc.subscription._
+import zio._
 
 final case class CoapMessage(header: CoapHeader, body: CoapBody) {
 
-  def isConfirmable: Boolean    = this.header.msgType.value == 0
-  def isNonConfirmable: Boolean = this.header.msgType.value == 1
+  def isConfirmable: Boolean    = this.header.coapType.value == 0
+  def isNonConfirmable: Boolean = this.header.coapType.value == 1
 
+  // TODO: COAPOPTION VALUE NEEDS REWRITE!
   val getPath: IO[SuccessfulFailure, NonEmptyChunk[String]] = {
     this.body.options match {
       case Some(optionChunk) =>
-        val routes = optionChunk
+        val routes = optionChunk.value
            .collect {
             case option if option.number.value == 11 => option.optValue.content
           }.collect {
@@ -47,6 +49,13 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
 object CoapMessage {
   def reset(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
   def ack  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
+
+  def fromDatagram(datagram: Chunk[Byte]) =
+    for {
+      header  <- CoapHeader.fromDatagram(datagram)
+      body    <- chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
+      message <- validateMessage(header, body)
+    } yield message
 
   def fromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
     CoapDeserializerService.extractFromChunk(chunk)

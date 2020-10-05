@@ -1,11 +1,22 @@
-package domain.model.coap
+package domain.model.coap.body
 
-import zio.Chunk
+import domain.model.exception._
+import zio._
 
 import scala.collection.immutable.HashMap
 
 
-sealed trait CoapPayload
+abstract class CoapPayload
+
+object CoapPayload {
+
+  def fromWith(content: Chunk[Byte], format: CoapPayloadMediaType): IO[MessageFormatError, Option[CoapPayload]] =
+    content.headOption match {
+      case Some(byte) => if (byte == 0xFF.toByte) IO.some(format.transform(content)) else IO.fail(InvalidPayloadMarker)
+      case None       => IO.none
+    }
+
+}
 
 // TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
 final case class TextCoapPayload private(value: String) extends CoapPayload

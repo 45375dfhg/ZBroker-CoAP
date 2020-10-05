@@ -9,7 +9,7 @@ import zio.Chunk
 object ResponseService {
 
   def getAcknowledgment(msg: CoapMessage): Chunk[Byte] =
-    CoapSerializerService.generateFromMessage(acknowledgeMessage(msg.header.msgID))
+    CoapSerializerService.generateFromMessage(acknowledgeMessage(msg.header.coapId))
 
   def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
     CoapSerializerService.generateFromMessage(resetMessage(msg._2))

@@ -11,13 +11,11 @@ import domain.model.coap.header._
 import domain.model.config.ConfigRepository
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository._
-
 import utility.PartialTypes._
 import utility.PublisherResponseExtension._
-
 import subgrpc.subscription.PublisherResponse
-
 import zio._
+import zio.console._
 import zio.nio.core._
 
 object PublisherServer {
@@ -27,7 +25,7 @@ object PublisherServer {
    */
   val make =
     for {
-      n <- ConfigRepository.getStreamFiberAmount
+      n <- ConfigRepository.getStreamFiberAmount <* putStrLn("[PUB] PublisherServer  loading Config. Starting ...")
       _ <- ChunkStreamRepository.getChunkStream.mapMParUnordered(n.value)(serverRoutine).runDrain
     } yield ()
 
@@ -94,7 +92,7 @@ object PublisherServer {
    * Drops all CoapMessages that do not contain the "PUT" code.
    * */
   private def sendableMessage: PartialValidMessage = {
-    case msg @ CoapMessage(header, _) if header.cPrefix.value == 0 && header.cSuffix.value == 3 => msg
+    case msg @ CoapMessage(header, _) if header.coapCodePrefix.value == 0 && header.coapCodeSuffix.value == 3 => msg
   }
 
   /**

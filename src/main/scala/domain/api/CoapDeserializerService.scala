@@ -1,14 +1,14 @@
 package domain.api
 
-import domain.model.coap._
+import domain.model.coap.{body, _}
+import domain.model.coap.body.{CoapBody, CoapOption, CoapPayload, CoapPayloadMediaType, SniffingMediaType}
 import domain.model.coap.header._
 import domain.model.coap.option._
+import domain.model.exception.{GatewayError, InvalidOptionDelta, InvalidOptionLength, InvalidPayloadMarker, MessageFormatError}
 
 import Numeric.Implicits._
-
 import utility.ChunkExtension._
-
-import zio.{Chunk, IO, UIO, URIO}
+import zio.{Chunk, _}
 
 
 /**
@@ -31,26 +31,27 @@ object CoapDeserializerService {
 
   def extractFromChunk(chunk: Chunk[Byte]): UIO[Either[IgnoredMessageWithIdOption, CoapMessage]] =
     (for {
-      header  <- chunk.takeExactly(4) >>= headerFromChunk
+      header  <- CoapHeader.fromDatagram(chunk)
       body    <- chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
       message <- validateMessage(header, body)
-    } yield message).flatMapError(err => URIO(err) <*> getMsgIdFromMessage(chunk)).either
+    } yield message).flatMapError(err => URIO.succeed(err) <*> CoapId.fromDatagram(chunk).option).either
 
   /**
    * Attempts to form a CoapHeader when handed a Chunk of size 4.
    * Might fail with header parameter dependent errors.
    */
   private def headerFromChunk(chunk: Chunk[Byte]): IO[MessageFormatError, CoapHeader] = {
+    // This extraction is reliant on the fact that this function will only be called after takeExactly was called!
     val (b1, b2, b3, b4) = (chunk(0), chunk(1), chunk(2), chunk(3))
 
     for {
-      version <- getVersionFrom(b1)
-      msgType <- getMsgTypeFrom(b1)
-      tLength <- getTLengthFrom(b1)
-      prefix  <- getCPrefixFrom(b2)
-      suffix  <- getCSuffixFrom(b2)
-      msgId   <- getMsgIdFrom(b3, b4)
-    } yield CoapHeader(version, msgType, tLength ,prefix, suffix, msgId)
+      v <- CoapVersion.fromByte(b1)
+      t <- CoapType.fromByte(b1)
+      l <- CoapTokenLength.fromByte(b1)
+      p <- CoapCodePrefix.fromByte(b2)
+      s <- CoapCodeSuffix.fromByte(b2)
+      i <- CoapId.fromBytes(b3, b4)
+    } yield CoapHeader(v, t, l ,p, s, i)
   }
 
   /**
@@ -64,10 +65,32 @@ object CoapDeserializerService {
    */
   private def bodyFromChunk(chunk: Chunk[Byte], header: CoapHeader): IO[MessageFormatError, CoapBody] = {
 
-    def extractTokenFrom(chunk: Chunk[Byte]): IO[MessageFormatError, CoapToken] =
-      chunk.takeExactly(header.tLength.value).map(CoapToken)
-
     type OptionListAndPayload = (Chunk[CoapOption], Chunk[Byte])
+
+    type OptionTuple = (Option[NonEmptyChunk[CoapOption]], Option[CoapPayload])
+
+    def extractTokenFrom(chunk: Chunk[Byte]): IO[GatewayError, Option[CoapToken]] = {
+      if (header.coapTokenLength.value > 0) chunk.takeExactlyN(header.coapTokenLength.value).map(t => Some(CoapToken(t)))
+      else ZIO.none
+    }
+
+    def getOptionListFrom2(
+      chunk: Chunk[Byte], acc: Chunk[CoapOption] = Chunk.empty, num: Int = 0
+    ): IO[MessageFormatError, OptionTuple] =
+      chunk.headOption match {
+        case Some(b) =>
+          if (b == 0xFF.toByte)
+            IO.fromOption(NonEmptyChunk.fromChunk(chunk.drop(1)))
+              .orElseFail(InvalidPayloadMarker)
+              .map(load => (NonEmptyChunk.fromChunk(acc), Some(CoapPayload.fromWith(load, )))
+
+            // IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker).flatMap { case (list, load) =>
+
+          // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+        case None => IO.succeed(acc, Chunk.empty)
+      }
+
 
     def getOptionListFrom(
       chunk: Chunk[Byte], acc: Chunk[CoapOption] = Chunk.empty, num: Int = 0
@@ -92,17 +115,16 @@ object CoapDeserializerService {
         number       <- getNumber(d, ed, num)
         value        <- getValue(body, l, od + ol, number)
         totalOffset   = CoapOptionOffset(od.value + ol.value + length.value + 1)
-      } yield CoapOption(d, ed, l, el, number, value, totalOffset)
+      } yield body.CoapOption(d, ed, l, el, number, value, totalOffset)
 
     for {
-      tuple1             <- extractTokenFrom(chunk) <&> chunk.dropExactly(header.tLength.value)
-      (token, remainder)  = tuple1
+      token              <- extractTokenFrom(chunk)
+      remainder          <- chunk.dropExactly(header.coapTokenLength.value)
       tuple2             <- getOptionListFrom(remainder)
       (options, payload)  = tuple2
-      tokenO              = Option.when(token.value.nonEmpty)(token)
       optionsO            = Option.when(options.nonEmpty)(options)
       payloadO            = Option.when(payload.nonEmpty)(getPayloadFromWith(payload, getPayloadMediaTypeFrom(options)))
-    } yield CoapBody(tokenO, optionsO, payloadO)
+    } yield CoapBody(token, optionsO, payloadO)
   }
 
   type DeltaTriplet = (CoapOptionDelta, Option[CoapOptionExtendedDelta], CoapOptionOffset)
@@ -179,24 +201,8 @@ object CoapDeserializerService {
   private def getFirstByteFrom(bytes: Chunk[Byte]): IO[MessageFormatError, Int] =
     bytes.takeExactly(1).map(_.head.toInt)
 
-  // TODO: 0xFF necessary?
   private def mergeNextTwoBytes(bytes: Chunk[Byte]): IO[MessageFormatError, Int] =
     bytes.takeExactly(2).map(chunk => ((chunk(0) << 8) & 0xFF) | (chunk(1) & 0xFF))
-
-  private def getVersionFrom(b: Byte): IO[MessageFormatError, CoapVersion] =
-    CoapVersion((b & 0xF0) >>> 6)
-
-  private def getMsgTypeFrom(b: Byte): IO[MessageFormatError, CoapType] =
-    CoapType((b & 0x30) >> 4)
-
-  private def getTLengthFrom(b: Byte): IO[MessageFormatError, CoapTokenLength] =
-    CoapTokenLength(b & 0x0F)
-
-  private def getCPrefixFrom(b: Byte): IO[MessageFormatError, CoapCodePrefix] =
-    CoapCodePrefix((b & 0xE0) >>> 5)
-
-  private def getCSuffixFrom(b: Byte): IO[MessageFormatError, CoapCodeSuffix] =
-    CoapCodeSuffix(b & 0x1F)
 
   private def getMsgIdFrom(third: Byte, fourth: Byte): IO[MessageFormatError, CoapId] =
     CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))

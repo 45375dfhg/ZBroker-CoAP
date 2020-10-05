@@ -1,6 +1,4 @@
-package domain.model.coap
-
-import domain.model.exception.GatewayError
+package domain.model.exception
 
 
 sealed trait MessageFormatError                       extends GatewayError
