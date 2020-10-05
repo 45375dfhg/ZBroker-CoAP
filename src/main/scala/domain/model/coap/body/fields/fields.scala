@@ -2,10 +2,8 @@ package domain.model.coap.body
 
 import java.nio.ByteBuffer
 
-import domain.model.exception.{GatewayError, InvalidCoapOptionNumber, InvalidOptionDelta, InvalidOptionLength, MessageFormatError, UnreachableCodeError}
+import domain.model.exception._
 import io.estatico.newtype.macros.newtype
-import io.estatico.newtype.ops.toCoercibleIdOps
-import utility.ChunkExtension.ChunkExtension
 import zio.{Chunk, IO, ZIO}
 
 import scala.collection.immutable.HashMap
@@ -14,9 +12,9 @@ package object fields {
 
   @newtype class CoapOptionDelta private(val value: Int) {
     val offset = value match {
-      case zero if 0   to 12    contains zero => 0
-      case one  if 13  to 268   contains one  => 1
-      case two  if 269 to 65804 contains two  => 2
+      case zero if 0 to 12 contains zero => 0
+      case one if 13 to 268 contains one => 1
+      case two if 269 to 65804 contains two => 2
     }
   }
 
@@ -28,7 +26,7 @@ package object fields {
     def fromOptionHeader(header: Byte): IO[InvalidOptionDelta, CoapOptionDelta] =
       (header & 0xF0) >>> 4 match {
         case basic if 0 to 14 contains basic => IO.succeed(basic.coerce)
-        case err                             => IO.fail(InvalidOptionDelta(s"$err"))
+        case err => IO.fail(InvalidOptionDelta(s"$err"))
       }
 
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
@@ -37,7 +35,7 @@ package object fields {
         case basic if 0 to 12 contains basic => IO.succeed(coapOptionDelta)
         case 13 => remainder.takeExactly(1).map(_.head.toInt) >>= (n => CoapOptionDelta(n + 13))
         case 14 => remainder.takeExactly(2).map(c => ((c(0) << 8) & 0xFF) | (c(1) & 0xFF)) >>= (n => CoapOptionDelta(n + 269))
-        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+        case _ => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
       }
   }
 
@@ -86,10 +84,10 @@ package object fields {
   @newtype class CoapOptionNumber private(val value: Int) {
 
     def getOptionFormat: CoapOptionValueFormat =
-      CoapOptionNumber.format(value)._1
+      CoapOptionNumber.getFormat(value)._1
 
     def getOptionLengthRange: Range =
-      CoapOptionNumber.format(value)._2
+      CoapOptionNumber.getFormat(value)._2
 
     def getOptionProperties: (Boolean, Boolean, Boolean, Boolean) =
       CoapOptionNumber.properties(value)
@@ -101,7 +99,7 @@ package object fields {
   object CoapOptionNumber {
 
     def getFormat(number: CoapOptionNumber): CoapOptionValueFormat =
-      format(number.value)._1
+      getFormat(number.value)._1
 
     /**
      * Returns a quadruple of Booleans that represent the properties
@@ -112,7 +110,7 @@ package object fields {
       properties(number.value)
 
     // https://tools.ietf.org/html/rfc7959#section-2.1
-    private val format: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
+    private val getFormat: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
       1 -> (OpaqueOptionValueFormat, 0 to 8),
       3 -> (StringOptionValueFormat, 1 to 255),
       4 -> (OpaqueOptionValueFormat, 1 to 8),
@@ -152,7 +150,7 @@ package object fields {
       60 -> (false, false, true, true)
     )
 
-    private val numbers = format.keySet
+    private val numbers = getFormat.keySet
 
     def apply(value: Int): IO[MessageFormatError, CoapOptionNumber] =
       IO.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))

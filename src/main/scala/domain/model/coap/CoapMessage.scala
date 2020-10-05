@@ -19,7 +19,7 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
       case Some(optionChunk) =>
         val routes = optionChunk.value
            .collect {
-            case option if option.number.value == 11 => option.optValue.content
+            case option if option.coapOptionNumber.value == 11 => option.coapOptionValue.content
           }.collect {
            case StringCoapOptionValueContent(value) => value
         }

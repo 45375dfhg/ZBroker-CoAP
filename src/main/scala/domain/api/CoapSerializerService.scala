@@ -53,8 +53,8 @@ object CoapSerializerService {
        * values as well as the related option value.
        */
       def generateOneOption(option: CoapOption): Chunk[Byte] =
-        (option.delta.value + option.length.value).toByte +:
-          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.optValue))
+        (option.coapOptionDelta.value + option.coapOptionLength.value).toByte +:
+          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.coapOptionValue))
 
       list.flatMap(generateOneOption)
     }

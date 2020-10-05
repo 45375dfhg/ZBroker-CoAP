@@ -40,7 +40,7 @@ object CoapBody {
           // IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker).flatMap { case (list, load) =>
 
           // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
-          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.coapOptionNumber.value))
         case None => IO.succeed(acc, Chunk.empty)
       }
 
@@ -52,7 +52,7 @@ object CoapBody {
         case Some(b) =>
           if (b == 0xFF.toByte) IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker)
           // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
-          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.coapOptionNumber.value))
         case None => IO.succeed(acc, Chunk.empty)
       }
 

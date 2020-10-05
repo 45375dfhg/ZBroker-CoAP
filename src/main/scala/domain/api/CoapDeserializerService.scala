@@ -87,7 +87,7 @@ object CoapDeserializerService {
             // IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker).flatMap { case (list, load) =>
 
           // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
-          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.coapOptionNumber.value))
         case None => IO.succeed(acc, Chunk.empty)
       }
 
@@ -99,7 +99,7 @@ object CoapDeserializerService {
         case Some(b) =>
           if (b == 0xFF.toByte) IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker)
           // ZIO assures that these kind of non-tail recursive calls are stack- and heap-safe
-          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.number.value))
+          else getNextOption(chunk, num) >>= (o => getOptionListFrom(chunk.drop(o.offset.value), acc :+ o, o.coapOptionNumber.value))
         case None => IO.succeed(acc, Chunk.empty)
       }
 
@@ -217,8 +217,8 @@ object CoapDeserializerService {
    * a placeholder MediaType is passed.
    */
   private def getPayloadMediaTypeFrom(list: Chunk[CoapOption]): CoapPayloadMediaType =
-    list.find(_.number.value == 12) match {
-        case Some(option) => option.optValue.content match {
+    list.find(_.coapOptionNumber.value == 12) match {
+        case Some(option) => option.coapOptionValue.content match {
           case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
           case _                             => SniffingMediaType
         }
