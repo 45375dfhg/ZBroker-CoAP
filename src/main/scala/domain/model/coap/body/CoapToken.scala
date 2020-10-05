@@ -9,7 +9,7 @@ final case class CoapToken(value: NonEmptyChunk[Byte]) extends AnyVal
 
 case object CoapToken {
 
-  def fromBody(chunk: Chunk[Byte], coapTokenLength: CoapTokenLength): IO[GatewayError, Option[CoapToken]] =
+  def fromBodyWith(chunk: Chunk[Byte], coapTokenLength: CoapTokenLength): IO[GatewayError, Option[CoapToken]] =
     if (coapTokenLength.value > 0) chunk.takeExactlyN(coapTokenLength.value).map(t => Some(CoapToken(t)))
     else ZIO.none
 }

@@ -4,6 +4,7 @@ import domain.api.CoapDeserializerService
 import domain.model.coap.body._
 import domain.model.coap.body.fields._
 import domain.model.coap.header._
+import domain.model.coap.header.fields.CoapId
 import domain.model.exception._
 import subgrpc.subscription._
 import zio._
@@ -53,12 +54,11 @@ object CoapMessage {
   def fromDatagram(datagram: Chunk[Byte]) =
     for {
       header  <- CoapHeader.fromDatagram(datagram)
-      body    <- chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
-      message <- validateMessage(header, body)
-    } yield message
+      body    <- CoapBody.fromDatagramWith(datagram, header) //chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
+    } yield () //message <- ??? // validateMessage(header, body)
 
-  def fromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
-    CoapDeserializerService.extractFromChunk(chunk)
+//  def fromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
+//    CoapDeserializerService.extractFromChunk(chunk)
 }
 
 

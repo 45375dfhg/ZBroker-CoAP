@@ -24,7 +24,7 @@ package object fields {
     def apply(value: Int): IO[MessageFormatError, CoapOptionDelta] =
       IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
 
-    def fromDatagram(header: Byte, body: Chunk[Byte]): IO[GatewayError, CoapOptionDelta] =
+    def fromWith(header: Byte, body: Chunk[Byte]): IO[GatewayError, CoapOptionDelta] =
       CoapOptionDelta.fromOptionHeader(header).flatMap(CoapOptionDelta.extend(_, body))
 
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
@@ -56,7 +56,7 @@ package object fields {
     def apply(value: Int): IO[MessageFormatError, CoapOptionLength] =
       IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
 
-    def fromDatagram(header: Byte, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
+    def fromWith(header: Byte, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
       fromOptionHeader(header).flatMap(extend(_, body, offset))
 
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
