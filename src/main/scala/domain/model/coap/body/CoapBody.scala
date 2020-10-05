@@ -83,11 +83,9 @@ object CoapBody {
   val empty = CoapBody(None, None, None)
 }
 
-final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal
 
-case object CoapOptionList {
-  def fromBody(chunk: Chunk[Byte], acc: Chunk[CoapOption] = Chunk.empty, num: Int = 0) = ???
-}
+
+
 
 
 //final case class CoapToken(value: NonEmptyChunk[Byte]) extends AnyVal

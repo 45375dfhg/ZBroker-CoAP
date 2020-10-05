@@ -3,8 +3,10 @@ package domain.model.coap.body
 import java.nio.ByteBuffer
 
 import domain.model.exception._
-import io.estatico.newtype.macros.newtype
-import zio.{Chunk, IO, ZIO}
+import io.estatico.newtype.macros._
+import io.estatico.newtype.ops._
+import utility.ChunkExtension._
+import zio._
 
 import scala.collection.immutable.HashMap
 
@@ -12,9 +14,9 @@ package object fields {
 
   @newtype class CoapOptionDelta private(val value: Int) {
     val offset = value match {
-      case zero if 0 to 12 contains zero => 0
-      case one if 13 to 268 contains one => 1
-      case two if 269 to 65804 contains two => 2
+      case zero if 0   to 12    contains zero => 0
+      case one  if 13  to 268   contains one  => 1
+      case two  if 269 to 65804 contains two  => 2
     }
   }
 
@@ -22,56 +24,56 @@ package object fields {
     def apply(value: Int): IO[MessageFormatError, CoapOptionDelta] =
       IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
 
+    def fromDatagram(header: Byte, body: Chunk[Byte]): IO[GatewayError, CoapOptionDelta] =
+      CoapOptionDelta.fromOptionHeader(header).flatMap(CoapOptionDelta.extend(_, body))
+
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
     def fromOptionHeader(header: Byte): IO[InvalidOptionDelta, CoapOptionDelta] =
       (header & 0xF0) >>> 4 match {
         case basic if 0 to 14 contains basic => IO.succeed(basic.coerce)
-        case err => IO.fail(InvalidOptionDelta(s"$err"))
+        case err                             => IO.fail(InvalidOptionDelta(s"$err"))
       }
 
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    def extend(coapOptionDelta: CoapOptionDelta, remainder: Chunk[Byte]): ZIO[Any, GatewayError, CoapOptionDelta] =
+    private def extend(coapOptionDelta: CoapOptionDelta, body: Chunk[Byte]): ZIO[Any, GatewayError, CoapOptionDelta] =
       coapOptionDelta.value match {
         case basic if 0 to 12 contains basic => IO.succeed(coapOptionDelta)
-        case 13 => remainder.takeExactly(1).map(_.head.toInt) >>= (n => CoapOptionDelta(n + 13))
-        case 14 => remainder.takeExactly(2).map(c => ((c(0) << 8) & 0xFF) | (c(1) & 0xFF)) >>= (n => CoapOptionDelta(n + 269))
-        case _ => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+        case 13 => body.takeExactly(1).map(_.head) >>= (n => CoapOptionDelta(n + 13)) // TODO: head.toInt?
+        case 14 => body.takeExactly(2).map(merge)  >>= (n => CoapOptionDelta(n + 269))
+        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
       }
   }
 
-  @newtype class CoapOptionExtendedDelta private(val value: Int)
-
-  object CoapOptionExtendedDelta {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedDelta] =
-    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
-    // The extension value must be greater than 12 which is a highest non special construct value.
-      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
-  }
-
-  @newtype class CoapOptionLength private(val value: Int)
-
-  object CoapOptionLength {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionLength] = {
-      // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
-      // ... while 13 and 14 lead to special constructs via ext8 and ext16
-      // WARNING: This is an "open" bounded implementation! Errors must be caught on creation.
-      IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
+  @newtype class CoapOptionLength private(val value: Int) {
+    val offset = value match {
+      case zero if 0   to 12    contains zero => 0
+      case one  if 13  to 268   contains one  => 1
+      case two  if 269 to 65804 contains two  => 2
     }
   }
 
-  @newtype class CoapOptionExtendedLength private(val value: Int)
+  object CoapOptionLength {
+    def apply(value: Int): IO[MessageFormatError, CoapOptionLength] =
+      IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
 
-  object CoapOptionExtendedLength {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedLength] =
-    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
-    // The extension value must be greater than 12 which is a highest non special construct value.
-      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
-  }
+    def fromDatagram(header: Byte, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
+      fromOptionHeader(header).flatMap(extend(_, body, offset))
 
-  @newtype case class CoapOptionOffset(value: Int)
+    // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    def fromOptionHeader(header: Byte): IO[InvalidOptionDelta, CoapOptionLength] =
+      header & 0x0F match {
+        case basic if 0 to 14 contains basic => IO.succeed(basic.coerce)
+        case err                             => IO.fail(InvalidOptionDelta(s"$err"))
+      }
 
-  object CoapOptionOffset {
-    implicit val numeric: Numeric[CoapOptionOffset] = deriving
+    // ... while 13 and 14 lead to special constructs via ext8 and ext16
+    private def extend(coapOptionLength: CoapOptionLength, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
+      coapOptionLength.value match {
+        case basic if 0 to 12 contains basic => IO.succeed(coapOptionLength)
+        case 13 => body.dropExactly(offset).flatMap(_.takeExactly(1)).map(_.head) >>= (n => CoapOptionLength(n + 13)) // TODO: head.toInt?
+        case 14 => body.dropExactly(offset).flatMap(_.takeExactly(2)).map(merge)  >>= (n => CoapOptionLength(n + 269))
+        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+      }
   }
 
   @newtype class CoapOptionValue private(val content: CoapOptionValueContent)
@@ -79,6 +81,14 @@ package object fields {
   object CoapOptionValue {
     def apply(number: CoapOptionNumber, raw: Chunk[Byte]): CoapOptionValue =
       number.getOptionFormat.transform(raw, number.getOptionLengthRange).coerce
+
+    def make(
+      body   : Chunk[Byte],
+      length : CoapOptionLength,
+      offset : Int,
+      number : CoapOptionNumber
+    ): IO[MessageFormatError, CoapOptionValue] =
+      body.dropExactly(offset).flatMap(_.takeExactly(length.value)).map(CoapOptionValue(number, _))
   }
 
   @newtype class CoapOptionNumber private(val value: Int) {
@@ -111,12 +121,12 @@ package object fields {
 
     // https://tools.ietf.org/html/rfc7959#section-2.1
     private val getFormat: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
-      1 -> (OpaqueOptionValueFormat, 0 to 8),
-      3 -> (StringOptionValueFormat, 1 to 255),
-      4 -> (OpaqueOptionValueFormat, 1 to 8),
-      5 -> (EmptyOptionValueFormat, 0 to 0),
-      7 -> (IntOptionValueFormat, 0 to 2),
-      8 -> (StringOptionValueFormat, 0 to 255),
+      1  -> (OpaqueOptionValueFormat, 0 to 8),
+      3  -> (StringOptionValueFormat, 1 to 255),
+      4  -> (OpaqueOptionValueFormat, 1 to 8),
+      5  -> (EmptyOptionValueFormat, 0 to 0),
+      7  -> (IntOptionValueFormat, 0 to 2),
+      8  -> (StringOptionValueFormat, 0 to 255),
       11 -> (StringOptionValueFormat, 0 to 255),
       12 -> (IntOptionValueFormat, 0 to 2),
       14 -> (IntOptionValueFormat, 0 to 4),
@@ -131,12 +141,12 @@ package object fields {
     )
 
     private val properties = HashMap(
-      1 -> (true, false, false, true),
-      3 -> (true, true, false, false),
-      4 -> (false, false, false, true),
-      5 -> (true, false, false, true),
-      7 -> (true, true, false, false),
-      8 -> (false, false, false, true),
+      1  -> (true, false, false, true),
+      3  -> (true, true, false, false),
+      4  -> (false, false, false, true),
+      5  -> (true, false, false, true),
+      7  -> (true, true, false, false),
+      8  -> (false, false, false, true),
       11 -> (true, true, false, true),
       12 -> (false, false, false, false),
       14 -> (false, true, false, false),
@@ -215,4 +225,38 @@ package object fields {
 
   @newtype case class Repeatable(value: Boolean)
 
+  /**
+   * A small helper functions that takes a Chunk[Byte] and merges the first two Bytes into an Int
+   * There is no previous check on the index access validity so an unhandled error is possible.
+   */
+  private val merge = (c: Chunk[Byte]) => ((c(0) << 8) & 0xFF) | (c(1) & 0xFF)
+
+  // REMOVE BELOW
+  // REMOVE BELOW
+  // REMOVE BELOW
+  // REMOVE BELOW
+
+  @newtype class CoapOptionExtendedDelta private(val value: Int)
+
+  object CoapOptionExtendedDelta {
+    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedDelta] =
+    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
+    // The extension value must be greater than 12 which is a highest non special construct value.
+      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+  }
+
+  @newtype class CoapOptionExtendedLength private(val value: Int)
+
+  object CoapOptionExtendedLength {
+    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedLength] =
+    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
+    // The extension value must be greater than 12 which is a highest non special construct value.
+      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
+  }
+
+  @newtype case class CoapOptionOffset(value: Int)
+
+  object CoapOptionOffset {
+    implicit val numeric: Numeric[CoapOptionOffset] = deriving
+  }
 }

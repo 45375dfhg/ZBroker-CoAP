@@ -180,7 +180,7 @@ object CoapDeserializerService {
 
   private def getNumber(delta: CoapOptionDelta, extendedDelta: Option[CoapOptionExtendedDelta], num: Int) =
     extendedDelta match {
-      case Some(ext) => CoapOptionNumber(ext.value + num)
+      case Some(ext) => CoapOptionNumber(num + ext.value)
       case None      => CoapOptionNumber(num + delta.value)
     }
 
