@@ -2,21 +2,43 @@ package domain.model.coap.body
 
 import java.nio.ByteBuffer
 
-import domain.model.exception.{InvalidCoapOptionNumber, InvalidOptionDelta, InvalidOptionLength, MessageFormatError}
+import domain.model.exception.{GatewayError, InvalidCoapOptionNumber, InvalidOptionDelta, InvalidOptionLength, MessageFormatError, UnreachableCodeError}
 import io.estatico.newtype.macros.newtype
-import zio.{Chunk, IO}
+import io.estatico.newtype.ops.toCoercibleIdOps
+import utility.ChunkExtension.ChunkExtension
+import zio.{Chunk, IO, ZIO}
 
 import scala.collection.immutable.HashMap
 
 package object fields {
 
-  @newtype class CoapOptionDelta private(val value: Int)
+  @newtype class CoapOptionDelta private(val value: Int) {
+    val offset = value match {
+      case zero if 0   to 12    contains zero => 0
+      case one  if 13  to 268   contains one  => 1
+      case two  if 269 to 65804 contains two  => 2
+    }
+  }
 
   object CoapOptionDelta {
     def apply(value: Int): IO[MessageFormatError, CoapOptionDelta] =
+      IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
+    def fromOptionHeader(header: Byte): IO[InvalidOptionDelta, CoapOptionDelta] =
+      (header & 0xF0) >>> 4 match {
+        case basic if 0 to 14 contains basic => IO.succeed(basic.coerce)
+        case err                             => IO.fail(InvalidOptionDelta(s"$err"))
+      }
+
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
-      IO.cond(0 to 15 contains value, value.coerce, InvalidOptionDelta(s"$value"))
+    def extend(coapOptionDelta: CoapOptionDelta, remainder: Chunk[Byte]): ZIO[Any, GatewayError, CoapOptionDelta] =
+      coapOptionDelta.value match {
+        case basic if 0 to 12 contains basic => IO.succeed(coapOptionDelta)
+        case 13 => remainder.takeExactly(1).map(_.head.toInt) >>= (n => CoapOptionDelta(n + 13))
+        case 14 => remainder.takeExactly(2).map(c => ((c(0) << 8) & 0xFF) | (c(1) & 0xFF)) >>= (n => CoapOptionDelta(n + 269))
+        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+      }
   }
 
   @newtype class CoapOptionExtendedDelta private(val value: Int)
