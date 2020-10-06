@@ -19,7 +19,7 @@ object CoapBody {
       token   <- CoapToken.fromBodyWith(body, header.coapTokenLength)
       options <- CoapOptionList.fromBodyWith(datagram, header.coapTokenLength)
       offset   = header.coapTokenLength.value + options.fold(0)(_.offset)
-      payload <- CoapPayload.fromWith(body, options, offset)
+      payload <- CoapPayload.fromWithExcluding(body, options, offset)
     } yield CoapBody(token, options, payload)
 
     val empty = CoapBody(None, None, None)

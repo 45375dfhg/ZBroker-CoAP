@@ -82,7 +82,7 @@ object CoapDeserializerService {
           if (b == 0xFF.toByte)
             IO.fromOption(NonEmptyChunk.fromChunk(chunk.drop(1)))
               .orElseFail(InvalidPayloadMarker)
-              .map(load => (NonEmptyChunk.fromChunk(acc), Some(CoapPayload.fromWith(load, )))
+              .map(load => (NonEmptyChunk.fromChunk(acc), Some(CoapPayload.fromWithExcluding(load, )))
 
             // IO.cond(chunk.tail.nonEmpty, (acc, chunk.drop(1)), InvalidPayloadMarker).flatMap { case (list, load) =>
 
@@ -226,7 +226,7 @@ object CoapDeserializerService {
       }
 
   private def getPayloadFromWith(chunk: Chunk[Byte], payloadMediaType: CoapPayloadMediaType): CoapPayload =
-    payloadMediaType.transform(chunk)
+    payloadMediaType.applyOn(chunk)
 
   // TODO: Implement empty message check in general and for reset messages
   private def validateMessage(header: CoapHeader, body: CoapBody): IO[MessageFormatError, CoapMessage] =
