@@ -1,9 +1,9 @@
 package domain.api
 
-import domain.api.CoapDeserializerService.IgnoredMessageWithId
-import domain.model.coap.header._
-import domain.model.coap._
 
+import domain.model.coap._
+import domain.model.coap.header.fields._
+import utility.PartialTypes._
 import zio.Chunk
 
 object ResponseService {

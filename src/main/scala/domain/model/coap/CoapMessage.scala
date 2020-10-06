@@ -1,20 +1,21 @@
 package domain.model.coap
 
-import domain.api.CoapDeserializerService
 import domain.model.coap.body._
 import domain.model.coap.body.fields._
 import domain.model.coap.header._
-import domain.model.coap.header.fields.CoapId
+import domain.model.coap.header.fields._
 import domain.model.exception._
 import subgrpc.subscription._
 import zio._
 
-final case class CoapMessage(header: CoapHeader, body: CoapBody) {
+final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
+
+  // Kinda poor validation sequencing but enough for now
+  def validated = IO.cond(valid, self, InvalidEmptyMessage)
 
   def isConfirmable: Boolean    = this.header.coapType.value == 0
   def isNonConfirmable: Boolean = this.header.coapType.value == 1
 
-  // TODO: COAPOPTION VALUE NEEDS REWRITE!
   val getPath: IO[SuccessfulFailure, NonEmptyChunk[String]] = {
     this.body.options match {
       case Some(optionChunk) =>
@@ -39,6 +40,19 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) {
     }
   }
 
+  private val isReset       = self.header.coapType.value == 3
+
+  private val hasEmptyCode  = self.header.coapCodePrefix.value == 0 && self.header.coapCodeSuffix.value == 0
+
+  private val tokenZero     = self.header.coapTokenLength.value == 0
+  private val isTokenLess   = self.body.token.isEmpty
+  private val isOptionLess  = self.body.options.isEmpty
+  private val isPayloadLess = self.body.options.isEmpty
+
+  private val isEmptyMessage: Boolean = hasEmptyCode && tokenZero && isTokenLess && isOptionLess && isPayloadLess
+
+  private val valid      = (!isReset && !hasEmptyCode) || (hasEmptyCode && isEmptyMessage)
+
   val toPublisherResponse: IO[SuccessfulFailure, PublisherResponse] =
     (getPath <*> getContent).map { case (route, content) => toPublisherResponseWith(route, content) }
 
@@ -51,14 +65,12 @@ object CoapMessage {
   def reset(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
   def ack  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
 
-  def fromDatagram(datagram: Chunk[Byte]) =
-    for {
-      header  <- CoapHeader.fromDatagram(datagram)
-      body    <- CoapBody.fromDatagramWith(datagram, header) //chunk.dropExactly(4) >>= (bodyFromChunk(_, header))
-    } yield () //message <- ??? // validateMessage(header, body)
+  def fromDatagram(datagram: Chunk[Byte]): IO[GatewayError, CoapMessage] =
+    (for {
+      header    <- CoapHeader.fromDatagram(datagram)
+      body      <- CoapBody.fromDatagramWith(datagram, header)
+    } yield CoapMessage(header, body)).flatMap(_.validated)
 
-//  def fromChunk(chunk: Chunk[Byte]): UIO[Either[(MessageFormatError, Option[CoapId]), CoapMessage]] =
-//    CoapDeserializerService.extractFromChunk(chunk)
 }
 
 

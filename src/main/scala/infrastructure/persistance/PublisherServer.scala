@@ -7,7 +7,7 @@ import domain.model.broker.BrokerRepository._
 import domain.model.broker._
 import domain.model.chunkstream._
 import domain.model.coap._
-import domain.model.coap.header._
+import domain.model.coap.header.fields._
 import domain.model.config.ConfigRepository
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository._
@@ -34,7 +34,7 @@ object PublisherServer {
    * @param streamChunk A tuple which might contain a SocketAddress and definitely contains a Chunk[Byte].
    */
   private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) =
-    (UIO.succeed(streamChunk._1) <*> CoapMessage.fromChunk(streamChunk._2)) // TODO: REFACTOR THE EITHER PART
+    (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
       .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
       .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage).collect(UnsharablePayload)(sendableMessage)
@@ -72,7 +72,7 @@ object PublisherServer {
    * @param streamChunk A tuple that might contain a SocketAddress and will either contain a CoapMessage or
    *                    its parsing error combined with the recovered CoapId.
    */
-  private def sendReset(streamChunk: (Option[SocketAddress], Either[(MessageFormatError, CoapId), CoapMessage])) =
+  private def sendReset(streamChunk: (Option[SocketAddress], Either[(GatewayError, CoapId), CoapMessage])) =
     streamChunk match {
       case (address, either) => either match {
         case Left(value) =>

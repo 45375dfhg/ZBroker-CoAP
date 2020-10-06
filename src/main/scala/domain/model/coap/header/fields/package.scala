@@ -1,8 +1,10 @@
 package domain.model.coap.header
 
 import domain.model.exception._
-import io.estatico.newtype.macros.newtype
-import zio.{Chunk, IO}
+import io.estatico.newtype.macros._
+import io.estatico.newtype.ops._
+import utility.ChunkExtension._
+import zio._
 
 package object fields {
 
@@ -10,7 +12,7 @@ package object fields {
 
   object CoapVersion {
     def apply(value: Int): IO[MessageFormatError, CoapVersion] =
-    // #rfc7252 knows only one valid protocol version
+      // #rfc7252 knows only one valid protocol version
       IO.cond(1 to 1 contains value, value.coerce, InvalidCoapVersion(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapVersion] =
@@ -23,7 +25,7 @@ package object fields {
 
   object CoapType {
     def apply(value: Int): IO[MessageFormatError, CoapType] =
-    // #rfc7252 accepts 4 different types in a 2-bit window
+      // #rfc7252 accepts 4 different types in a 2-bit window
       IO.cond(0 to 3 contains value, value.coerce, InvalidCoapType(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapType] =
@@ -37,7 +39,7 @@ package object fields {
 
   object CoapTokenLength {
     def apply(value: Int): IO[MessageFormatError, CoapTokenLength] =
-    // #rfc7252 accepts a length of 0 to 8 in a 4-bit window, 9 to 15 are reserved
+      // #rfc7252 accepts a length of 0 to 8 in a 4-bit window, 9 to 15 are reserved
       IO.cond(0 to 8 contains value, value.coerce, InvalidCoapTokenLength(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapTokenLength] =
@@ -50,7 +52,7 @@ package object fields {
 
   object CoapCodePrefix {
     def apply(value: Int): IO[MessageFormatError, CoapCodePrefix] =
-    // #rfc7252 accepts prefix codes between 0 to 7 in a 3-bit window
+      // #rfc7252 accepts prefix codes between 0 to 7 in a 3-bit window
       IO.cond(0 to 7 contains value, value.coerce, InvalidCoapCode(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapCodePrefix] =
@@ -63,7 +65,7 @@ package object fields {
 
   object CoapCodeSuffix {
     def apply(value: Int): IO[MessageFormatError, CoapCodeSuffix] =
-    // #rfc7252 accepts suffix codes between 0 to 31 in a 5-bit window
+      // #rfc7252 accepts suffix codes between 0 to 31 in a 5-bit window
       IO.cond(0 to 31 contains value, value.coerce, InvalidCoapCode(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapCodeSuffix] =
@@ -76,14 +78,15 @@ package object fields {
 
   object CoapId {
     def apply(value: Int): IO[MessageFormatError, CoapId] =
-    // #rfc7252 accepts an unsigned 16-bit ID
+      // #rfc7252 accepts an unsigned 16-bit ID
       IO.cond(0 to 65535 contains value, value.coerce, InvalidCoapId(s"$value"))
 
     def fromBytes(third: Byte, fourth: Byte): IO[MessageFormatError, CoapId] =
       CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
 
-    def fromDatagram(datagram: Chunk[Byte]): IO[MessageFormatError, CoapId] =
-      datagram.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => fromBytes(c.head, c.tail.head))
+    def recoverFrom(datagram: Chunk[Byte]): UIO[Option[CoapId]] =
+      datagram.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => fromBytes(c.head, c.tail.head)).option
+
   }
 
 }

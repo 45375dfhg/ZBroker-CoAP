@@ -64,12 +64,18 @@ sealed trait CoapPayloadMediaType
 
 object CoapPayloadMediaType {
 
-  def fromCoapOptionList(coapOptionList: CoapOptionList): CoapPayloadMediaType =
-    coapOptionList.value.find(_.coapOptionNumber.value == 12) match {
-      case Some(element) => element.coapOptionValue.content match {
-        case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
-        case _                             => SniffingMediaType // TODO: Technically this is unexpected parsing error!
-      }
+  def fromOption(coapOptionList: Option[CoapOptionList]): CoapPayloadMediaType =
+    coapOptionList match {
+      case Some(value) => fromCoapOptionList(value)
+      case None        => SniffingMediaType
+    }
+
+    def fromCoapOptionList(coapOptionList: CoapOptionList): CoapPayloadMediaType =
+      coapOptionList.value.find(_.coapOptionNumber.value == 12) match {
+        case Some(element) => element.coapOptionValue.content match {
+          case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
+          case _                             => SniffingMediaType // TODO: Technically this is unexpected parsing error!
+        }
       case None => SniffingMediaType
     }
 

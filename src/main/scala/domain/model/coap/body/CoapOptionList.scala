@@ -11,6 +11,7 @@ final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal
     acc + c.coapOptionDelta.offset + c.coapOptionLength.offset + c.coapOptionLength.value + 1
   }
 
+  // TODO: Wrong place?
   def payloadMediaType: CoapPayloadMediaType =
     value.find(_.coapOptionNumber.value == 12) match {
       case Some(element) => element.coapOptionValue.content match {
@@ -24,7 +25,7 @@ final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal
 
 case object CoapOptionList {
 
-  def fromBodyWith(body: Chunk[Byte], coapTokenLength: CoapTokenLength): IO[GatewayError, Option[CoapOptionList]] =
+  def fromBodyExcluding(body: Chunk[Byte], coapTokenLength: CoapTokenLength): IO[GatewayError, Option[CoapOptionList]] =
     body.dropExactly(coapTokenLength.value).flatMap(body => getOptions(body))
 
   private def getOptions(
