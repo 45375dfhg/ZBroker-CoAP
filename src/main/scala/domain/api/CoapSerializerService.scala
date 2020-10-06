@@ -4,11 +4,13 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import domain.model.coap._
-import domain.model.coap.body.{CoapBody, CoapOption, CoapPayload, TextCoapPayload}
+import domain.model.coap.body._
+import domain.model.coap.body.fields._
 import domain.model.coap.header._
-import domain.model.coap.option._
-import utility.Extractor
+import domain.model.coap.header.fields._
+
 import utility.Extractor._
+
 import zio.Chunk
 
 /**
@@ -28,11 +30,10 @@ object CoapSerializerService {
    * While Chunks are implemented via Arrays they are implemented as Conc-Trees:
    * Their prepend complexity is 0(1).
    */
-  private def generateHeader(head: CoapHeader): Chunk[Byte] = {
+  private def generateHeader(head: CoapHeader): Chunk[Byte] =
     (((head.coapVersion.value << 6) + (head.coapType.value << 4) + head.coapTokenLength.value) +:
       ((head.coapCodePrefix.value << 5) + head.coapCodeSuffix.value) +:
         generateMessageId(head.coapId)).map(_.toByte)
-  }
 
   // TODO: WARNING: TOKEN MODEL NOT DONE AS OF NOW
   /**
@@ -40,6 +41,13 @@ object CoapSerializerService {
    * byte representation (inside of Chunks) and concatenates them as return value.
    */
   private def generateBody(body: CoapBody): Chunk[Byte] = {
+
+
+    def generateToken(tokenO: Option[CoapToken]): Chunk[Byte] =
+      tokenO match {
+        case Some(token) => token.value.toChunk
+        case None        => Chunk.empty
+      }
 
     /**
      * Transforms all provides internal representations of CoapOptions
@@ -58,6 +66,38 @@ object CoapSerializerService {
 
       list.flatMap(generateOneOption)
     }
+
+    def getHeaderDelta(coapOptionDelta: CoapOptionDelta) =
+      coapOptionDelta.value match {
+        case v if 0   to 12    contains v => v
+        case v if 13  to 268   contains v => 13
+        case v if 269 to 65804 contains v => 14
+        case _                            => 15
+      }
+
+    def getDeltaExtended(coapOptionDelta: CoapOptionDelta): Chunk[Byte] =
+      coapOptionDelta.value match {
+        case v if 0   to 12    contains v => Chunk.empty
+        case v if 13  to 268   contains v => Chunk((v - 13).toByte)
+        case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
+        case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
+      }
+
+    def getHeaderLength(coapOptionLength: CoapOptionLength) =
+      coapOptionLength.value match {
+        case v if 0   to 12    contains v => v
+        case v if 13  to 268   contains v => 13
+        case v if 269 to 65804 contains v => 14
+        case _                            => 15
+      }
+
+    def getDeltaExtended(coapOptionLength: CoapOptionLength): Chunk[Byte] =
+      coapOptionLength.value match {
+        case v if 0   to 12    contains v => Chunk.empty
+        case v if 13  to 268   contains v => Chunk((v - 13).toByte)
+        case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
+        case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
+      }
 
     // TODO: IMPLEMENT the other payload types
     def generatePayload(payload: CoapPayload): Chunk[Byte] = payload match {
