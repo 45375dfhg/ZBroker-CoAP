@@ -56,7 +56,7 @@ package object fields {
     def apply(value: Int): IO[MessageFormatError, CoapOptionLength] =
       IO.cond(0 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
 
-    def fromWith(header: Byte, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
+    def fromWithExcluding(header: Byte, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
       fromOptionHeader(header).flatMap(extend(_, body, offset))
 
     // #rfc7252 accepts a 4-bit unsigned integer - 15 is reserved for the payload marker
@@ -74,21 +74,6 @@ package object fields {
         case 14 => body.dropExactly(offset).flatMap(_.takeExactly(2)).map(merge)  >>= (n => CoapOptionLength(n + 269))
         case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
       }
-  }
-
-  @newtype class CoapOptionValue private(val content: CoapOptionValueContent)
-
-  object CoapOptionValue {
-    def apply(number: CoapOptionNumber, raw: Chunk[Byte]): CoapOptionValue =
-      number.getOptionFormat.transform(raw, number.getOptionLengthRange).coerce
-
-    def make(
-      body   : Chunk[Byte],
-      length : CoapOptionLength,
-      offset : Int,
-      number : CoapOptionNumber
-    ): IO[MessageFormatError, CoapOptionValue] =
-      body.dropExactly(offset).flatMap(_.takeExactly(length.value)).map(CoapOptionValue(number, _))
   }
 
   @newtype class CoapOptionNumber private(val value: Int) {
@@ -119,76 +104,102 @@ package object fields {
     def getProperties(number: CoapOptionNumber): (Boolean, Boolean, Boolean, Boolean) =
       properties(number.value)
 
-    // https://tools.ietf.org/html/rfc7959#section-2.1
+    /**
+     * Each CoapOptionNumber is mapped to a format. The CoapOptionNumber is represented as an Int.
+     * Each mapping also includes a value range which further specifies the CoapOption's size range.
+     * <p>
+     * Values are based on: https://tools.ietf.org/html/rfc7959#section-2.1
+     */
     private val getFormat: HashMap[Int, (CoapOptionValueFormat, Range)] = HashMap(
       1  -> (OpaqueOptionValueFormat, 0 to 8),
       3  -> (StringOptionValueFormat, 1 to 255),
       4  -> (OpaqueOptionValueFormat, 1 to 8),
-      5  -> (EmptyOptionValueFormat, 0 to 0),
-      7  -> (IntOptionValueFormat, 0 to 2),
+      5  -> (EmptyOptionValueFormat,  0 to 0),
+      7  -> (IntOptionValueFormat,    0 to 2),
       8  -> (StringOptionValueFormat, 0 to 255),
       11 -> (StringOptionValueFormat, 0 to 255),
-      12 -> (IntOptionValueFormat, 0 to 2),
-      14 -> (IntOptionValueFormat, 0 to 4),
+      12 -> (IntOptionValueFormat,    0 to 2),
+      14 -> (IntOptionValueFormat,    0 to 4),
       15 -> (StringOptionValueFormat, 0 to 255),
-      17 -> (IntOptionValueFormat, 0 to 2),
+      17 -> (IntOptionValueFormat,    0 to 2),
       20 -> (StringOptionValueFormat, 0 to 255),
-      23 -> (IntOptionValueFormat, 0 to 3),
-      27 -> (IntOptionValueFormat, 0 to 3),
+      23 -> (IntOptionValueFormat,    0 to 3),
+      27 -> (IntOptionValueFormat,    0 to 3),
       35 -> (StringOptionValueFormat, 1 to 1034),
       39 -> (StringOptionValueFormat, 1 to 255),
-      60 -> (IntOptionValueFormat, 0 to 4)
+      60 -> (IntOptionValueFormat,    0 to 4)
     )
 
     private val properties = HashMap(
-      1  -> (true, false, false, true),
-      3  -> (true, true, false, false),
+      1  -> (true,  false, false, true),
+      3  -> (true,  true,  false, false),
       4  -> (false, false, false, true),
-      5  -> (true, false, false, true),
-      7  -> (true, true, false, false),
+      5  -> (true,  false, false, true),
+      7  -> (true,  true,  false, false),
       8  -> (false, false, false, true),
-      11 -> (true, true, false, true),
+      11 -> (true,  true,  false, true),
       12 -> (false, false, false, false),
-      14 -> (false, true, false, false),
-      15 -> (true, true, false, true),
-      17 -> (true, false, false, false),
+      14 -> (false, true,  false, false),
+      15 -> (true,  true,  false, true),
+      17 -> (true,  false, false, false),
       20 -> (false, false, false, true),
-      23 -> (true, true, false, false),
-      27 -> (true, true, false, false),
-      35 -> (true, true, false, false),
-      39 -> (true, true, false, false),
-      60 -> (false, false, true, true)
+      23 -> (true,  true,  false, false),
+      27 -> (true,  true,  false, false),
+      35 -> (true,  true,  false, false),
+      39 -> (true,  true,  false, false),
+      60 -> (false, false, true,  true)
     )
 
     private val numbers = getFormat.keySet
 
-    def apply(value: Int): IO[MessageFormatError, CoapOptionNumber] =
+    private def apply(value: Int): IO[MessageFormatError, CoapOptionNumber] =
       IO.cond(numbers contains value, value.coerce, InvalidCoapOptionNumber(s"$value"))
+
+    def from(value: Int): IO[MessageFormatError, CoapOptionNumber] =
+      apply(value)
   }
 
+  /**
+   * A CoapOptionValue's format. The format can either be of type Int, String, Opaque or plain empty.
+   */
   sealed trait CoapOptionValueFormat {
-    def transform(raw: Chunk[Byte], range: Range): CoapOptionValueContent = this match {
-      case IntOptionValueFormat => IntCoapOptionValueContent(raw, range)
+    def applyOnWith(raw: Chunk[Byte], range: Range): CoapOptionValueContent = this match {
+      case IntOptionValueFormat    => IntCoapOptionValueContent(raw, range)
       case StringOptionValueFormat => StringCoapOptionValueContent(raw, range)
       case OpaqueOptionValueFormat => OpaqueCoapOptionValueContent(raw, range)
-      case EmptyOptionValueFormat => EmptyCoapOptionValueContent
+      case EmptyOptionValueFormat  => EmptyCoapOptionValueContent
     }
   }
 
-  case object IntOptionValueFormat extends CoapOptionValueFormat
-
+  case object IntOptionValueFormat    extends CoapOptionValueFormat
   case object StringOptionValueFormat extends CoapOptionValueFormat
-
   case object OpaqueOptionValueFormat extends CoapOptionValueFormat
+  case object EmptyOptionValueFormat  extends CoapOptionValueFormat
 
-  case object EmptyOptionValueFormat extends CoapOptionValueFormat
+  @newtype class CoapOptionValue private(val content: CoapOptionValueContent)
 
+  object CoapOptionValue {
+    def fromWith(raw: Chunk[Byte], number: CoapOptionNumber): CoapOptionValue =
+      number.getOptionFormat.applyOnWith(raw, number.getOptionLengthRange).coerce
 
-  sealed trait CoapOptionValueContent
+    def fromWithExcluding(
+      body   : Chunk[Byte],
+      length : CoapOptionLength,
+      number : CoapOptionNumber,
+      offset : Int,
+    ): IO[MessageFormatError, CoapOptionValue] =
+      body.dropExactly(offset).flatMap(_.takeExactly(length.value)).map(CoapOptionValue.fromWith(_, number))
+  }
 
-  case object UnrecognizedValueContent extends CoapOptionValueContent
-
-  case object EmptyCoapOptionValueContent extends CoapOptionValueContent
+  sealed abstract class CoapOptionValueContent {
+    def fromWith(chunk: Chunk[Byte], range: Range, coapOptionValueFormat: CoapOptionValueFormat) =
+      coapOptionValueFormat match {
+        case IntOptionValueFormat    => IntCoapOptionValueContent(chunk, range)
+        case StringOptionValueFormat => StringCoapOptionValueContent(chunk, range)
+        case OpaqueOptionValueFormat => OpaqueCoapOptionValueContent(chunk, range)
+        case EmptyOptionValueFormat  => EmptyCoapOptionValueContent
+      }
+  }
 
   final case class IntCoapOptionValueContent private(value: Int) extends CoapOptionValueContent
 
@@ -217,12 +228,13 @@ package object fields {
       else UnrecognizedValueContent
   }
 
+  case object UnrecognizedValueContent    extends CoapOptionValueContent
+  case object EmptyCoapOptionValueContent extends CoapOptionValueContent
+
+  // TODO: Not in-use yet
   @newtype case class Critical(value: Boolean)
-
   @newtype case class Unsafe(value: Boolean)
-
   @newtype case class NoCacheKey(value: Boolean)
-
   @newtype case class Repeatable(value: Boolean)
 
   /**

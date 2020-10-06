@@ -36,7 +36,7 @@ case object CoapOptionList {
       case None       => IO.succeed(NonEmptyChunk.fromChunk(acc).map(CoapOptionList(_)))
       case Some(byte) =>
         if (byte == marker) IO.succeed(NonEmptyChunk.fromChunk(acc).map(CoapOptionList(_)))
-        else getNextOption(chunk, num) >>= { case (o, n) => getOptions(chunk.drop(n), acc :+ o, o.coapOptionNumber.value) }
+        else getNextOption(chunk, num) >>= { case (e, o) => getOptions(chunk.drop(o), acc :+ e, e.coapOptionNumber.value) }
     }
 
   private def getNextOption(chunk: Chunk[Byte], num: Int): IO[GatewayError, (CoapOption, Int)] =
@@ -44,9 +44,9 @@ case object CoapOptionList {
       header       <- chunk.takeExactly(1).map(_.head)
       body         <- chunk.dropExactly(1)
       optionDelta  <- CoapOptionDelta.fromWith(header, body)
-      optionLength <- CoapOptionLength.fromWith(header, body, optionDelta.offset)
-      optionNumber <- CoapOptionNumber(optionDelta.value + num)
-      optionValue  <- CoapOptionValue.make(body, optionLength, optionDelta.offset + optionLength.offset, optionNumber)
+      optionLength <- CoapOptionLength.fromWithExcluding(header, body, optionDelta.offset)
+      optionNumber <- CoapOptionNumber.from(optionDelta.value + num)
+      optionValue  <- CoapOptionValue.fromWithExcluding(body, optionLength, optionNumber, optionDelta.offset + optionLength.offset)
       n             = optionDelta.offset + optionLength.offset + optionLength.value + 1
     } yield (CoapOption(optionDelta, optionLength, optionNumber, optionValue), n)
 
