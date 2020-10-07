@@ -1,6 +1,5 @@
 package utility
 
-import domain.model.coap._
 import domain.model.exception._
 import zio.{Chunk, IO, NonEmptyChunk}
 

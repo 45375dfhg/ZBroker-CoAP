@@ -10,7 +10,7 @@ import domain.model.coap.header._
 import domain.model.coap.header.fields._
 import utility.Extractor
 import utility.Extractor._
-import zio.{Chunk, NonEmptyChunk}
+import zio._
 
 /**
  * This service provides functionality to transform an internal representation of a CoAP message
@@ -63,7 +63,7 @@ object CoapSerializerService {
           (getExtensionFrom(option.coapOptionDelta) ++ getExtensionFrom(option.coapOptionLength) ++
             getOptionValueFrom(option.coapOptionValue))
 
-      optionsO.fold(Chunk[Byte]())(_.value.flatMap(serializeOneOption))
+      optionsO.fold(Chunk[Byte]())(_.value.toChunk.flatMap(serializeOneOption))
     }
 
     // TODO: IMPLEMENT the other payload types if necessary?

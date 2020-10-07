@@ -1,14 +1,15 @@
 package infrastructure.environment
 
-import domain.model.chunkstream.ChunkStreamRepository.Channel
-import domain.model.config.ConfigRepository.ConfigRepository
-import domain.model.exception.GatewayError
-import infrastructure.persistance.endpoint.EndpointFromSocket
-import zio.{UIO, ZLayer}
+import domain.model.chunkstream.ChunkStreamRepository._
+import domain.model.config.ConfigRepository._
+import domain.model.exception._
+import infrastructure.persistance.endpoint._
+import zio.console._
+import zio._
 
 object EndpointEnvironment {
 
   // TODO: NOT TOO PRETTY
-  val fromChannel: ZLayer[ConfigRepository, GatewayError, Channel] =
+  val fromChannel: ZLayer[ConfigRepository with Console, GatewayError, Channel] =
     ZLayer.fromAcquireRelease(EndpointFromSocket.datagramChannel)(channel => UIO(channel.close))
 }

@@ -13,7 +13,7 @@ import scala.collection.immutable.HashMap
 package object fields {
 
   @newtype class CoapOptionDelta private(val value: Int) {
-    val offset = value match {
+    def offset = value match {
       case zero if 0   to 12    contains zero => 0
       case one  if 13  to 268   contains one  => 1
       case two  if 269 to 65804 contains two  => 2
@@ -45,7 +45,7 @@ package object fields {
   }
 
   @newtype class CoapOptionLength private(val value: Int) {
-    val offset = value match {
+    def offset = value match {
       case zero if 0   to 12    contains zero => 0
       case one  if 13  to 268   contains one  => 1
       case two  if 269 to 65804 contains two  => 2
