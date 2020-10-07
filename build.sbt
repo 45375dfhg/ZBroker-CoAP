@@ -6,24 +6,40 @@ version := "0.1"
 
 run / fork := true
 
-
 PB.targets in Compile := Seq(
     scalapb.gen(grpc = true) -> (sourceManaged in Compile).value,
     scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value,
 )
 
-libraryDependencies ++= Seq(
-    // ZIO
-    "dev.zio" %% "zio" % "1.0.1",
-    "dev.zio" %% "zio-streams" % "1.0.1",
-    "dev.zio" %% "zio-nio" % "1.0.0-RC9",
+val zioVersion = "1.0.1"
+
+val zio = Seq(
+    "dev.zio" %% "zio"         % zioVersion,
+    "dev.zio" %% "zio-streams" % zioVersion,
+)
+
+val zio_nio = Seq(
+    "dev.zio" %% "zio-nio"      % "1.0.0-RC9",
     "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
-    // NEWTYPE
-    "io.estatico" %% "newtype" % "0.4.4",
-    // ZIO GRPC
+)
+
+val zio_grpc = Seq(
     "io.grpc" % "grpc-netty" % "1.31.1",
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
 )
+
+val newtype = Seq(
+    "io.estatico" %% "newtype" % "0.4.4",
+)
+
+val spec = Seq(
+    "dev.zio" %% "zio-test"     % zioVersion % "test",
+    "dev.zio" %% "zio-test-sbt" % zioVersion % "test",
+)
+
+libraryDependencies ++= zio ++ zio_nio ++ zio_grpc ++ newtype ++ spec
+
+testFrameworks += new TestFramework("zio.test.sbt.ZTestFramework")
 
 scalacOptions ++= Seq(
     "-target:jvm-1.11",
