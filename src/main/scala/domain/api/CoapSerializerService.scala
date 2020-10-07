@@ -8,10 +8,9 @@ import domain.model.coap.body._
 import domain.model.coap.body.fields._
 import domain.model.coap.header._
 import domain.model.coap.header.fields._
-
+import utility.Extractor
 import utility.Extractor._
-
-import zio.Chunk
+import zio.{Chunk, NonEmptyChunk}
 
 /**
  * This service provides functionality to transform an internal representation of a CoAP message
@@ -20,8 +19,8 @@ import zio.Chunk
  */
 object CoapSerializerService {
 
-  def generateFromMessage(message: CoapMessage): Chunk[Byte] =
-    generateHeader(message.header) ++ generateBody(message.body)
+  def serializeMessage(message: CoapMessage): Chunk[Byte] =
+    serializeHeader(message.header) ++ serializeBody(message.body)
 
   /**
    * Generates the parameters of the first header byte and prepends them to the parameters of the second
@@ -30,7 +29,7 @@ object CoapSerializerService {
    * While Chunks are implemented via Arrays they are implemented as Conc-Trees:
    * Their prepend complexity is 0(1).
    */
-  private def generateHeader(head: CoapHeader): Chunk[Byte] =
+  private def serializeHeader(head: CoapHeader): Chunk[Byte] =
     (((head.coapVersion.value << 6) + (head.coapType.value << 4) + head.coapTokenLength.value) +:
       ((head.coapCodePrefix.value << 5) + head.coapCodeSuffix.value) +:
         generateMessageId(head.coapId)).map(_.toByte)
@@ -40,10 +39,9 @@ object CoapSerializerService {
    * Sequentially transforms the token, the list of options and the payload into their respective
    * byte representation (inside of Chunks) and concatenates them as return value.
    */
-  private def generateBody(body: CoapBody): Chunk[Byte] = {
+  private def serializeBody(body: CoapBody): Chunk[Byte] = {
 
-
-    def generateToken(tokenO: Option[CoapToken]): Chunk[Byte] =
+    def serializeToken(tokenO: Option[CoapToken]): Chunk[Byte] =
       tokenO match {
         case Some(token) => token.value.toChunk
         case None        => Chunk.empty
@@ -54,85 +52,48 @@ object CoapSerializerService {
      * into a Chunk of Byte. Since the internal rep. is checked on creation
      * for correction, this transformation assumes correct values.
      */
-    def generateAllOptions(list: Chunk[CoapOption]): Chunk[Byte] = {
+    def serializeAllOptions(optionsO: Option[CoapOptionList]): Chunk[Byte] = {
 
       /**
        * Forms the header as a singular value and prepends it possible Chunks of extended delta and length
        * values as well as the related option value.
        */
-      def generateOneOption(option: CoapOption): Chunk[Byte] =
-        (option.coapOptionDelta.value + option.coapOptionLength.value).toByte +:
-          (getExtensionFrom(option.exDelta) ++ getExtensionFrom(option.exLength) ++ getOptionValueFrom(option.coapOptionValue))
+      def serializeOneOption(option: CoapOption): Chunk[Byte] =
+        (getHeaderByte(option.coapOptionDelta) + getHeaderByte(option.coapOptionLength)).toByte +:
+          (getExtensionFrom(option.coapOptionDelta) ++ getExtensionFrom(option.coapOptionLength) ++
+            getOptionValueFrom(option.coapOptionValue))
 
-      list.flatMap(generateOneOption)
+      optionsO.fold(Chunk[Byte]())(_.value.flatMap(serializeOneOption))
     }
 
-    def getHeaderDelta(coapOptionDelta: CoapOptionDelta) =
-      coapOptionDelta.value match {
-        case v if 0   to 12    contains v => v
-        case v if 13  to 268   contains v => 13
-        case v if 269 to 65804 contains v => 14
-        case _                            => 15
+    // TODO: IMPLEMENT the other payload types if necessary?
+    def serializePayload(payloadO: Option[CoapPayload]): Chunk[Byte] =
+      payloadO match {
+        case Some(payload) => payload match {
+          case p : TextCoapPayload => Chunk.fromArray(p.value.map(_.toByte).toArray)
+          case _ => Chunk[Byte]()
+        }
+        case None          => Chunk[Byte]()
       }
 
-    def getDeltaExtended(coapOptionDelta: CoapOptionDelta): Chunk[Byte] =
-      coapOptionDelta.value match {
-        case v if 0   to 12    contains v => Chunk.empty
-        case v if 13  to 268   contains v => Chunk((v - 13).toByte)
-        case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
-        case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
-      }
-
-    def getHeaderLength(coapOptionLength: CoapOptionLength) =
-      coapOptionLength.value match {
-        case v if 0   to 12    contains v => v
-        case v if 13  to 268   contains v => 13
-        case v if 269 to 65804 contains v => 14
-        case _                            => 15
-      }
-
-    def getDeltaExtended(coapOptionLength: CoapOptionLength): Chunk[Byte] =
-      coapOptionLength.value match {
-        case v if 0   to 12    contains v => Chunk.empty
-        case v if 13  to 268   contains v => Chunk((v - 13).toByte)
-        case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
-        case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
-      }
-
-    // TODO: IMPLEMENT the other payload types
-    def generatePayload(payload: CoapPayload): Chunk[Byte] = payload match {
-      case p : TextCoapPayload => Chunk.fromArray(p.value.map(_.toByte).toArray)
-      case _ => Chunk[Byte]()
-    }
-
-    (body.token match {
-      case Some(t) => t.value
-      case None => Chunk.empty
-    }) ++ (body.options match {
-      case Some(opts) => generateAllOptions(opts)
-      case None => Chunk.empty
-    }) ++ (body.payload match {
-      case Some(pay) => generatePayload(pay)
-      case None => Chunk.empty
-    })
+    serializeToken(body.token) ++ serializeAllOptions(body.options) ++ serializePayload(body.payload)
   }
 
-  /**
-   * Option Delta and Option Length can but most not be extended. If the internal representation of an Option contains
-   * an extended value, that value might be of size one or two bytes. This functions returns the respective Chunk[Byte]
-   * presentation of the saved Integer value. Additionally, it subtracts either 13 or 269 from the value.
-   *
-   * @param opt An Option of an Extractor member.
-   * @tparam A An Extractor type class member - all members are value classes,
-   *           thus they hold a single extractable integer
-   * @return A Chunk[Byte] of either length 1 or 2.
-   */
-  private def getExtensionFrom[A : Extractor](opt: Option[A]): Chunk[Byte] =
-    opt.fold(Chunk[Byte]()) { e =>
-      if (e.extract < 269) Chunk((e.extract - 13).toByte)
-      else Chunk((((e.extract - 269) >> 8) & 0xFF).toByte, ((e.extract - 269) & 0xFF).toByte)
+  def getHeaderByte[A : Extractor](optionHeaderParam: A): Int =
+    optionHeaderParam.extract match {
+      case v if 0   to 12    contains v => v
+      case v if 13  to 268   contains v => 13
+      case v if 269 to 65804 contains v => 14
+      case _                            => 15
     }
 
+  def getExtensionFrom[A : Extractor](optionHeaderParam: A): Chunk[Byte] =
+    optionHeaderParam.extract match {
+      case v if 0   to 12    contains v => Chunk.empty
+      case v if 13  to 268   contains v => Chunk((v - 13).toByte)
+      case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
+      case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
+    }
   /**
    * Converts the internal representation of a single Option Value into a Chunk[Byte] ready for outward traffic.
    *
@@ -148,5 +109,6 @@ object CoapSerializerService {
     case UnrecognizedValueContent          => Chunk.empty
   }
 
+  // TODO: Refactor this and other similar functions into a utility package!
   private def generateMessageId(id: CoapId): Chunk[Int] = Chunk((id.value >> 8) & 0xFF, id.value & 0xFF)
 }
