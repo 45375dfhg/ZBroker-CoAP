@@ -9,7 +9,19 @@ final case class CoapBody(
   token   : Option[CoapToken],
   options : Option[CoapOptionList],
   payload : Option[CoapPayload]
-)
+) {
+  def toByteChunk: Chunk[Byte] =
+    tokenToByteChunk ++ optionsToByteChunk ++ payloadToByteChunk
+
+  def tokenToByteChunk: Chunk[Byte] =
+    token.fold(Chunk[Byte]())(_.toByteChunk)
+
+  def optionsToByteChunk: Chunk[Byte] =
+    options.fold(Chunk[Byte]())(_.value.toChunk.flatMap(_.toByteChunk))
+
+  def payloadToByteChunk: Chunk[Byte] =
+    payload.fold(Chunk[Byte]())(_.toByteChunk)
+}
 
 object CoapBody {
 

@@ -1,5 +1,6 @@
 package utility
 
+// TODO: YIKES THIS GOTTA GO
 object ControllerStrings {
 
   val bootFromMemory = "Program is loading configuration from memory ..."

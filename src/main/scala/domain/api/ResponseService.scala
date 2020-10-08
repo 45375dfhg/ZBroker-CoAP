@@ -9,30 +9,14 @@ import zio.Chunk
 object ResponseService {
 
   def getAcknowledgment(msg: CoapMessage): Chunk[Byte] =
-    CoapSerializerService.serializeMessage(acknowledgeMessage(msg.header.coapId))
+    acknowledgeMessage(msg.header.coapId).toByteChunk
 
   def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
-    CoapSerializerService.serializeMessage(resetMessage(msg._2))
-
-  def hasResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Boolean =
-    msg match {
-      case Right(message) if message.isConfirmable => true
-      case Left((_, _))                            => true
-      case _                                       => false
-    }
+    resetMessage(msg._2).toByteChunk
 
   private def resetMessage(id: CoapId): CoapMessage =
-    CoapMessage.reset(id)
+    CoapMessage.asResetWith(id)
 
   private def acknowledgeMessage(id: CoapId): CoapMessage =
-    CoapMessage.ack(id)
+    CoapMessage.asAckWith(id)
 }
-
-/*
-  private def generateResponse(msg: Either[IgnoredMessageWithId, CoapMessage]): Either[SuccessfulFailure, CoapMessage] =
-    msg match {
-      case Right(message) if message.isConfirmable => Right(acknowledgeMessage(message.header.msgID))
-      case Left((_, id))                           => Right(resetMessage(id))
-      case _                                       => Left(NoResponseAvailable)
-    }
- */

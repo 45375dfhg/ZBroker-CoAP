@@ -7,7 +7,12 @@ import zio._
 
 import scala.collection.immutable.HashMap
 
-abstract class CoapPayload
+abstract class CoapPayload {
+  def toByteChunk: Chunk[Byte] = this match {
+    case p : TextCoapPayload => Chunk.fromArray(p.value.map(_.toByte).toArray)
+    case _ => Chunk[Byte]()
+  }
+}
 
 // TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
 final case class TextCoapPayload private(value: String) extends CoapPayload

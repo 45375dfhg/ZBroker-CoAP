@@ -1,6 +1,5 @@
 package domain.model.coap.body
 
-
 import fields._
 import zio.Chunk
 

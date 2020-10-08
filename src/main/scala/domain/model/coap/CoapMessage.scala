@@ -10,8 +10,8 @@ import zio._
 
 final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
 
-  // Kinda poor validation sequencing but enough for now
-  def validated = IO.cond(valid, self, InvalidEmptyMessage)
+  def toByteChunk: Chunk[Byte] =
+    header.toByteChunk ++ body.toByteChunk
 
   def isConfirmable: Boolean    = this.header.coapType.value == 0
   def isNonConfirmable: Boolean = this.header.coapType.value == 1
@@ -40,18 +40,18 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
     }
   }
 
-  private val isReset       = self.header.coapType.value == 3
+  // Kinda poor validation sequencing but enough for now
+  def validated = IO.cond(valid, self, InvalidEmptyMessage)
 
-  private val hasEmptyCode  = self.header.coapCodePrefix.value == 0 && self.header.coapCodeSuffix.value == 0
+  private val isReset        = header.coapType.value == 3
+  private val hasEmptyCode   = header.coapCodePrefix.value == 0 && self.header.coapCodeSuffix.value == 0
+  private val tokenZero      = header.coapTokenLength.value == 0
+  private val isTokenLess    = body.token.isEmpty
+  private val isOptionLess   = body.options.isEmpty
+  private val isPayloadLess  = body.options.isEmpty
 
-  private val tokenZero     = self.header.coapTokenLength.value == 0
-  private val isTokenLess   = self.body.token.isEmpty
-  private val isOptionLess  = self.body.options.isEmpty
-  private val isPayloadLess = self.body.options.isEmpty
-
-  private val isEmptyMessage: Boolean = hasEmptyCode && tokenZero && isTokenLess && isOptionLess && isPayloadLess
-
-  private val valid      = (!isReset && !hasEmptyCode) || (hasEmptyCode && isEmptyMessage)
+  private val isEmptyMessage = hasEmptyCode && tokenZero && isTokenLess && isOptionLess && isPayloadLess
+  private val valid          = (!isReset && !hasEmptyCode) || (hasEmptyCode && isEmptyMessage)
 
   val toPublisherResponse: IO[SuccessfulFailure, PublisherResponse] =
     (getPath <*> getContent).map { case (route, content) => toPublisherResponseWith(route, content) }
@@ -62,8 +62,9 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
 }
 
 object CoapMessage {
-  def reset(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
-  def ack  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
+
+  def asResetWith(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
+  def asAckWith  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
 
   def fromDatagram(datagram: Chunk[Byte]): IO[GatewayError, CoapMessage] =
     (for {
