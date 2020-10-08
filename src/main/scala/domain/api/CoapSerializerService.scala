@@ -29,6 +29,7 @@ object CoapSerializerService {
    * While Chunks are implemented via Arrays they are implemented as Conc-Trees:
    * Their prepend complexity is 0(1).
    */
+  // TODO: create actual functions for each conversion!
   private def serializeHeader(head: CoapHeader): Chunk[Byte] =
     (((head.coapVersion.value << 6) + (head.coapType.value << 4) + head.coapTokenLength.value) +:
       ((head.coapCodePrefix.value << 5) + head.coapCodeSuffix.value) +:

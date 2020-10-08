@@ -52,5 +52,6 @@ scalacOptions ++= Seq(
     "-Ywarn-numeric-widen",
     "-Ywarn-value-discard",
     "-Ywarn-unused",
-    "-Ymacro-annotations" // required for NewType in 2.12.1+
+    "-Ymacro-annotations", // required for NewType in 2.12.1+
+    // "-language:implicitConversions" // used to e.g. extend the PublisherResponse object
 )
