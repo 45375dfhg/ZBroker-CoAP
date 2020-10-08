@@ -17,6 +17,7 @@ import zio._
  * into its respective low level form. The result type is of Chunk[Byte] and thus can be
  * transported to third parties via a ZIO-NIO channel
  */
+// TODO: Most logic can be moved to model / fields
 object CoapSerializerService {
 
   def serializeMessage(message: CoapMessage): Chunk[Byte] =
@@ -31,9 +32,8 @@ object CoapSerializerService {
    */
   // TODO: create actual functions for each conversion!
   private def serializeHeader(head: CoapHeader): Chunk[Byte] =
-    (((head.coapVersion.value << 6) + (head.coapType.value << 4) + head.coapTokenLength.value) +:
-      ((head.coapCodePrefix.value << 5) + head.coapCodeSuffix.value) +:
-        generateMessageId(head.coapId)).map(_.toByte)
+    head.toByteChunk
+
 
   // TODO: WARNING: TOKEN MODEL NOT DONE AS OF NOW
   /**
@@ -60,9 +60,8 @@ object CoapSerializerService {
        * values as well as the related option value.
        */
       def serializeOneOption(option: CoapOption): Chunk[Byte] =
-        (getHeaderByte(option.coapOptionDelta) + getHeaderByte(option.coapOptionLength)).toByte +:
-          (getExtensionFrom(option.coapOptionDelta) ++ getExtensionFrom(option.coapOptionLength) ++
-            getOptionValueFrom(option.coapOptionValue))
+        option.toByteChunk
+
 
       optionsO.fold(Chunk[Byte]())(_.value.toChunk.flatMap(serializeOneOption))
     }

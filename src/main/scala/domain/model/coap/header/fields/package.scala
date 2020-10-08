@@ -8,7 +8,9 @@ import zio._
 
 package object fields {
 
-  @newtype class CoapVersion private(val value: Int)
+  @newtype class CoapVersion private(val value: Int) {
+    def toHeaderPart: Int = value << 6
+  }
 
   object CoapVersion {
     def apply(value: Int): IO[MessageFormatError, CoapVersion] =
@@ -21,7 +23,9 @@ package object fields {
     val default: CoapVersion = 1.coerce
   }
 
-  @newtype class CoapType private(val value: Int)
+  @newtype class CoapType private(val value: Int) {
+    def toHeaderPart: Int = value << 4
+  }
 
   object CoapType {
     def apply(value: Int): IO[MessageFormatError, CoapType] =
@@ -35,7 +39,9 @@ package object fields {
     val reset: CoapType = 3.coerce
   }
 
-  @newtype class CoapTokenLength private(val value: Int)
+  @newtype class CoapTokenLength private(val value: Int) {
+    def toHeaderPart: Int = value
+  }
 
   object CoapTokenLength {
     def apply(value: Int): IO[MessageFormatError, CoapTokenLength] =
@@ -48,7 +54,9 @@ package object fields {
     val empty: CoapTokenLength = 0.coerce
   }
 
-  @newtype class CoapCodePrefix private(val value: Int)
+  @newtype class CoapCodePrefix private(val value: Int) {
+    def toHeaderPart: Int = value << 5
+  }
 
   object CoapCodePrefix {
     def apply(value: Int): IO[MessageFormatError, CoapCodePrefix] =
@@ -61,7 +69,9 @@ package object fields {
     val empty: CoapCodePrefix = 0.coerce
   }
 
-  @newtype class CoapCodeSuffix private(val value: Int)
+  @newtype class CoapCodeSuffix private(val value: Int) {
+    def toHeaderPart: Int = value
+  }
 
   object CoapCodeSuffix {
     def apply(value: Int): IO[MessageFormatError, CoapCodeSuffix] =
@@ -74,7 +84,9 @@ package object fields {
     val empty: CoapCodeSuffix = 0.coerce
   }
 
-  @newtype class CoapId private(val value: Int)
+  @newtype class CoapId private(val value: Int) {
+    def toHeaderPart: Chunk[Int] = Chunk((value >> 8) & 0xFF, value & 0xFF)
+  }
 
   object CoapId {
     def apply(value: Int): IO[MessageFormatError, CoapId] =

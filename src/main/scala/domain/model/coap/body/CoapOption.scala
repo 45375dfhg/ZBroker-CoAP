@@ -1,21 +1,17 @@
 package domain.model.coap.body
 
-import fields._
 
-//final case class CoapOption(
-//  delta    : CoapOptionDelta,
-//  exDelta  : Option[CoapOptionExtendedDelta],
-//  length   : CoapOptionLength,
-//  exLength : Option[CoapOptionExtendedLength],
-//  number   : CoapOptionNumber,
-//  optValue : CoapOptionValue,
-//  offset   : CoapOptionOffset
-//)
+import fields._
+import zio.Chunk
 
 final case class CoapOption(
   coapOptionDelta  : CoapOptionDelta,
   coapOptionLength : CoapOptionLength,
   coapOptionNumber : CoapOptionNumber,
   coapOptionValue  : CoapOptionValue,
-)
+) {
+  def toByteChunk: Chunk[Byte] =
+    (coapOptionDelta.toOptionHeader + coapOptionLength.toOptionHeader).toByte +:
+      (coapOptionDelta.toOptionBodyExt ++ coapOptionLength.toOptionBodyExt ++ coapOptionValue.toByteChunk)
+}
 

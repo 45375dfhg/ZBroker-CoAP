@@ -5,7 +5,10 @@ import domain.model.exception._
 import utility.ChunkExtension.ChunkExtension
 import zio._
 
-final case class CoapToken(value: NonEmptyChunk[Byte]) extends AnyVal
+final case class CoapToken(value: NonEmptyChunk[Byte]) extends AnyVal {
+  def toByteChunk: Chunk[Byte] =
+    value.toChunk
+}
 
 case object CoapToken {
 

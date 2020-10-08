@@ -1,11 +1,14 @@
 package domain.model.coap.body
 
 import java.nio.ByteBuffer
+import java.nio.charset.StandardCharsets
 
 import domain.model.exception._
 import io.estatico.newtype.macros._
 import io.estatico.newtype.ops._
 import utility.ChunkExtension._
+import utility.Extractor
+import utility.Extractor._
 import zio._
 
 import scala.collection.immutable.HashMap
@@ -18,6 +21,10 @@ package object fields {
       case one  if 13  to 268   contains one  => 1
       case two  if 269 to 65804 contains two  => 2
     }
+
+    def toOptionHeader: Int = getHeaderByte(this)
+
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this)
   }
 
   object CoapOptionDelta {
@@ -50,6 +57,10 @@ package object fields {
       case one  if 13  to 268   contains one  => 1
       case two  if 269 to 65804 contains two  => 2
     }
+
+    def toOptionHeader: Int = getHeaderByte(this)
+
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this)
   }
 
   object CoapOptionLength {
@@ -75,6 +86,22 @@ package object fields {
         case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
       }
   }
+
+  def getHeaderByte[A : Extractor](optionHeaderParam: A): Int =
+    optionHeaderParam.extract match {
+      case v if 0   to 12    contains v => v
+      case v if 13  to 268   contains v => 13
+      case v if 269 to 65804 contains v => 14
+      case _                            => 15
+    }
+
+  def getExtensionFrom[A : Extractor](optionHeaderParam: A): Chunk[Byte] =
+    optionHeaderParam.extract match {
+      case v if 0   to 12    contains v => Chunk.empty
+      case v if 13  to 268   contains v => Chunk((v - 13).toByte)
+      case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
+      case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
+    }
 
   @newtype class CoapOptionNumber private(val value: Int) {
 
@@ -176,7 +203,15 @@ package object fields {
   case object OpaqueOptionValueFormat extends CoapOptionValueFormat
   case object EmptyOptionValueFormat  extends CoapOptionValueFormat
 
-  @newtype class CoapOptionValue private(val content: CoapOptionValueContent)
+  @newtype class CoapOptionValue private(val content: CoapOptionValueContent) {
+    def toByteChunk: Chunk[Byte] = content match {
+      case c : IntCoapOptionValueContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+      case c : StringCoapOptionValueContent  => Chunk.fromArray(c.value.getBytes(StandardCharsets.UTF_8))
+      case c : OpaqueCoapOptionValueContent  => c.value
+      case EmptyCoapOptionValueContent       => Chunk.empty
+      case UnrecognizedValueContent          => Chunk.empty
+    }
+  }
 
   object CoapOptionValue {
     def fromWith(raw: Chunk[Byte], number: CoapOptionNumber): CoapOptionValue =

@@ -12,7 +12,12 @@ final case class CoapHeader(
   coapCodePrefix  : CoapCodePrefix,
   coapCodeSuffix  : CoapCodeSuffix,
   coapId          : CoapId
-)
+) {
+  def toByteChunk: Chunk[Byte] =
+    ((coapVersion.toHeaderPart + coapType.toHeaderPart + coapTokenLength.toHeaderPart) +:
+      ((coapCodePrefix.toHeaderPart + coapCodeSuffix.toHeaderPart) +:
+        coapId.toHeaderPart)).map(_.toByte)
+}
 
 object CoapHeader {
 
