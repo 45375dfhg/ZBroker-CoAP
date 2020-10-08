@@ -29,7 +29,7 @@ object CoapBody {
     for {
       body     <- datagram.dropExactly(4)
       token    <- CoapToken.fromBodyWith(body, header.coapTokenLength)
-      options  <- CoapOptionList.fromBodyExcluding(datagram, header.coapTokenLength)
+      options  <- CoapOptionList.fromBodyExcluding(body, header.coapTokenLength)
       offset    = header.coapTokenLength.value + options.fold(0)(_.offset)
       payload  <- CoapPayload.fromWithExcluding(body, CoapPayloadMediaType.fromOption(options), offset)
     } yield CoapBody(token, options, payload)

@@ -85,7 +85,7 @@ package object fields {
   }
 
   @newtype class CoapId private(val value: Int) {
-    def toHeaderPart: Chunk[Int] = Chunk((value >> 8) & 0xFF, value & 0xFF)
+    def toHeaderPart: Chunk[Int] = Chunk((value >>> 8) & 0xFF, value & 0xFF)
   }
 
   object CoapId {

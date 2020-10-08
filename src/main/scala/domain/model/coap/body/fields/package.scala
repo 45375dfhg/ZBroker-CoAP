@@ -22,9 +22,9 @@ package object fields {
       case two  if 269 to 65804 contains two  => 2
     }
 
-    def toOptionHeader: Int = getHeaderByte(this)
+    def toOptionHeader: Int = getHeaderByte(this.value)
 
-    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this)
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this.value)
   }
 
   object CoapOptionDelta {
@@ -58,9 +58,9 @@ package object fields {
       case two  if 269 to 65804 contains two  => 2
     }
 
-    def toOptionHeader: Int = getHeaderByte(this)
+    def toOptionHeader: Int = getHeaderByte(this.value)
 
-    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this)
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this.value)
   }
 
   object CoapOptionLength {
@@ -87,16 +87,16 @@ package object fields {
       }
   }
 
-  def getHeaderByte[A : Extractor](optionHeaderParam: A): Int =
-    optionHeaderParam.extract match {
+  def getHeaderByte(optionHeaderParam: Int): Int =
+    optionHeaderParam match {
       case v if 0   to 12    contains v => v
       case v if 13  to 268   contains v => 13
       case v if 269 to 65804 contains v => 14
       case _                            => 15
     }
 
-  def getExtensionFrom[A : Extractor](optionHeaderParam: A): Chunk[Byte] =
-    optionHeaderParam.extract match {
+  def getExtensionFrom(optionHeaderParam: Int): Chunk[Byte] =
+    optionHeaderParam match {
       case v if 0   to 12    contains v => Chunk.empty
       case v if 13  to 268   contains v => Chunk((v - 13).toByte)
       case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)

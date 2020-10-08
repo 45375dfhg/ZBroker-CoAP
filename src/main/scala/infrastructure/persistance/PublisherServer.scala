@@ -35,6 +35,7 @@ object PublisherServer {
    */
   private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) =
     (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
+      .tap(a => putStrLn(a._2.toString))
       .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
       .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage).collect(UnsharablePayload)(sendableMessage)

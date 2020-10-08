@@ -5,6 +5,7 @@ import domain.model.coap.header.fields._
 import domain.model.exception.GatewayError
 import utility.ChunkExtension._
 import zio._
+import zio.console.putStrLn
 
 final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal {
   def offset = value.foldLeft(0) { (acc, c) =>
@@ -48,7 +49,8 @@ case object CoapOptionList {
       optionLength <- CoapOptionLength.fromWithExcluding(header, body, optionDelta.offset)
       optionNumber <- CoapOptionNumber.from(optionDelta.value + num)
       optionValue  <- CoapOptionValue.fromWithExcluding(body, optionLength, optionNumber, optionDelta.offset + optionLength.offset)
-      n             = optionDelta.offset + optionLength.offset + optionLength.value + 1
+      n             = 1 + optionDelta.offset + optionLength.offset + optionLength.value
+
     } yield (CoapOption(optionDelta, optionLength, optionNumber, optionValue), n)
 
   private val marker: Byte = 0xFF.toByte
