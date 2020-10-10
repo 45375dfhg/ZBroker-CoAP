@@ -165,7 +165,7 @@ object TransactionalBroker {
   /**
    * Creates a STM of a TransactionalBroker.
    */
-  def make: STM[Nothing, TransactionalBroker] =
+  def make: USTM[TransactionalBroker] =
     for {
       buckets <- TMap.empty[Long, TQueue[PublisherResponse]]
       topics  <- TMap.empty[String, Set[Long]]
