@@ -2,6 +2,7 @@ package utility.classExtension
 
 import java.util
 
+import zio.nio.InetAddress_
 import zio.nio.core.InetAddress
 
 object InetAddressExtension {
@@ -15,6 +16,8 @@ object InetAddressExtension {
       }
 
     val hashCodeN: Int = util.Arrays.hashCode(inetAddress.address)
+
+    val ex = new InetAddress_(inetAddress)
   }
 
 }
