@@ -1,4 +1,4 @@
-package utility
+package utility.typeClass
 
 import domain.model.coap.body.fields._
 import domain.model.coap.header.fields._

@@ -3,7 +3,7 @@ package domain.model.coap.header
 import domain.model.exception._
 import io.estatico.newtype.macros._
 import io.estatico.newtype.ops._
-import utility.ChunkExtension._
+import utility.classExtension.ChunkExtension._
 import zio._
 
 package object fields {
@@ -18,7 +18,7 @@ package object fields {
       IO.cond(1 to 1 contains value, value.coerce, InvalidCoapVersion(s"$value"))
 
     def fromByte(b: Byte): IO[MessageFormatError, CoapVersion] =
-      CoapVersion((b & 0xF0) >>> 6)
+      CoapVersion((b & 0xC0) >>> 6)
 
     val default: CoapVersion = 1.coerce
   }
@@ -97,7 +97,7 @@ package object fields {
       CoapId(((third & 0xFF) << 8) | (fourth & 0xFF))
 
     def recoverFrom(datagram: Chunk[Byte]): UIO[Option[CoapId]] =
-      datagram.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => fromBytes(c.head, c.tail.head)).option
+      datagram.dropExactly(2).flatMap(_.takeExactly(2)).flatMap(c => fromBytes(c(0), c(1))).option
 
   }
 

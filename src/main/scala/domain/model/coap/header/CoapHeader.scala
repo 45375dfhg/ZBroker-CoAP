@@ -2,7 +2,7 @@ package domain.model.coap.header
 
 import domain.model.coap.header.fields._
 import domain.model.exception._
-import utility.ChunkExtension.ChunkExtension
+import utility.classExtension.ChunkExtension.ChunkExtension
 import zio._
 
 final case class CoapHeader(

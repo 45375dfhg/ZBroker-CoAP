@@ -6,9 +6,9 @@ import java.nio.charset.StandardCharsets
 import domain.model.exception._
 import io.estatico.newtype.macros._
 import io.estatico.newtype.ops._
-import utility.ChunkExtension._
-import utility.Extractor
-import utility.Extractor._
+
+import utility.classExtension.ChunkExtension._
+
 import zio._
 
 import scala.collection.immutable.HashMap

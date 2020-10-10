@@ -1,6 +1,6 @@
-package utility
+package utility.classExtension
 
-import domain.model.exception._
+import domain.model.exception.{GatewayError, InvalidCoapChunkSize, MessageFormatError, UnreachableCodeError}
 import zio.{Chunk, IO, NonEmptyChunk}
 
 object ChunkExtension {
@@ -21,7 +21,7 @@ object ChunkExtension {
       if (n > 0 && elements.lengthCompare(n) >= 0)
         NonEmptyChunk.fromChunk(elements) match {
           case Some(nonEmpty) => IO.succeed(nonEmpty)
-          case None           => IO.fail(UnreachableCodeError)
+          case None => IO.fail(UnreachableCodeError)
         }
       else IO.fail(InvalidCoapChunkSize(s"Failed to take $n elements, only ${chunk.size} available."))
     }
@@ -31,7 +31,11 @@ object ChunkExtension {
       else IO.fail(InvalidCoapChunkSize(s"Failed to drop $n elements, only ${chunk.size} available."))
 
     def tailOption: Option[Chunk[A]] =
-      if (chunk.drop(1).isEmpty) None else Some(chunk.tail)
+      if (chunk.tail.isEmpty) None else Some(chunk.tail)
+
+    def tailOptionN: Option[NonEmptyChunk[A]] =
+      if (chunk.tail.isEmpty) None else Some(NonEmptyChunk.fromIterable(chunk.tail.head, chunk.tail.tail))
 
   }
+
 }

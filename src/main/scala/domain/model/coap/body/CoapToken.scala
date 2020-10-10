@@ -2,7 +2,7 @@ package domain.model.coap.body
 
 import domain.model.coap.header.fields.CoapTokenLength
 import domain.model.exception._
-import utility.ChunkExtension.ChunkExtension
+import utility.classExtension.ChunkExtension.ChunkExtension
 import zio._
 
 final case class CoapToken(value: NonEmptyChunk[Byte]) extends AnyVal {

@@ -12,7 +12,7 @@ import domain.model.config.ConfigRepository
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository._
 import utility.PartialTypes._
-import utility.PublisherResponseExtension._
+import utility.classExtension.PublisherResponseExtension._
 import subgrpc.subscription.PublisherResponse
 import zio._
 import zio.console._
@@ -35,7 +35,6 @@ object PublisherServer {
    */
   private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) =
     (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
-      .tap(a => putStrLn(a._2.toString))
       .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
       .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage).collect(UnsharablePayload)(sendableMessage)

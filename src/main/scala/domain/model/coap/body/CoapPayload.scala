@@ -2,7 +2,7 @@ package domain.model.coap.body
 
 import domain.model.coap.body.fields._
 import domain.model.exception._
-import utility.ChunkExtension.ChunkExtension
+import utility.classExtension.ChunkExtension.ChunkExtension
 import zio._
 
 import scala.collection.immutable.HashMap

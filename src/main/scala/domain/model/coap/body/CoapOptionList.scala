@@ -3,9 +3,10 @@ package domain.model.coap.body
 import domain.model.coap.body.fields._
 import domain.model.coap.header.fields._
 import domain.model.exception.GatewayError
-import utility.ChunkExtension._
+import utility.classExtension.ChunkExtension._
+
 import zio._
-import zio.console.putStrLn
+
 
 final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal {
   def offset = value.foldLeft(0) { (acc, c) =>

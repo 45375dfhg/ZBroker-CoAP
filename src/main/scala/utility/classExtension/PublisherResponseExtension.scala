@@ -1,4 +1,4 @@
-package utility
+package utility.classExtension
 
 import subgrpc.subscription.{Path, PublisherResponse}
 import zio.NonEmptyChunk
