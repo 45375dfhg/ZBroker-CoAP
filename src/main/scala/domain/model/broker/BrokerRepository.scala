@@ -9,18 +9,17 @@ import zio.stm.TQueue
 
 object BrokerRepository {
 
-  type BrokerRepository = Has[BrokerRepository.Service]
+  type BrokerRepository[R] = Has[BrokerRepository.Service[R]]
 
-  trait Service {
+  trait Service[R] {
     def addTopic(uriPath: NonEmptyChunk[String]): UIO[Unit]
-    def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]]
-    def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit]
+    def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[R]]
+    def pushMessageTo(uriPath: Segments, msg: R): UIO[Unit]
     def addSubscriberTo(topics: Paths, id: Long): UIO[Unit]
     def removeSubscriber(id: Long): IO[MissingSubscriber, Unit]
     def getSubscribers(topic: String): UIO[Option[Set[Long]]]
     def removeSubscriptions(topics: Paths, id: Long): UIO[Unit]
-
-    val getNextId: UIO[Long]
+    def getNextId: UIO[Long]
   }
 
   /**
@@ -32,27 +31,27 @@ object BrokerRepository {
    */
   type Segments = NonEmptyChunk[String]
 
-  def addTopic(uriPath: NonEmptyChunk[String]): URIO[BrokerRepository, Unit] =
+  def addTopic[R: Tag](uriPath: NonEmptyChunk[String]): URIO[BrokerRepository[R], Unit] =
     ZIO.accessM(_.get.addTopic(uriPath))
 
-  def getQueue(id: Long): ZIO[BrokerRepository, MissingBrokerBucket, TQueue[PublisherResponse]] =
+  def getQueue[R: Tag](id: Long): ZIO[BrokerRepository[R], MissingBrokerBucket, TQueue[R]] =
     ZIO.accessM(_.get.getQueue(id))
 
-  def pushMessageTo(uriPath: Segments, msg: PublisherResponse): URIO[BrokerRepository, Unit] =
+  def pushMessageTo[R: Tag](uriPath: Segments, msg: R): URIO[BrokerRepository[R], Unit] =
     ZIO.accessM(_.get.pushMessageTo(uriPath, msg))
 
-  def addSubscriberTo(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
+  def addSubscriberTo[R: Tag](topics: Paths, id: Long): URIO[BrokerRepository[R], Unit] =
     ZIO.accessM(_.get.addSubscriberTo(topics, id))
 
-  def removeSubscriber(id: Long): ZIO[BrokerRepository, MissingSubscriber, Unit] =
+  def removeSubscriber[R: Tag](id: Long): ZIO[BrokerRepository[R], MissingSubscriber, Unit] =
     ZIO.accessM(_.get.removeSubscriber(id))
 
-  def getSubscribers(topic: String): URIO[BrokerRepository, Option[Set[Long]]] =
+  def getSubscribers[R: Tag](topic: String): URIO[BrokerRepository[R], Option[Set[Long]]] =
     ZIO.accessM(_.get.getSubscribers(topic))
 
-  def removeSubscriptions(topics: Paths, id: Long): URIO[BrokerRepository, Unit] =
+  def removeSubscriptions[R: Tag](topics: Paths, id: Long): URIO[BrokerRepository[R], Unit] =
     ZIO.accessM(_.get.removeSubscriptions(topics, id))
 
-  val getNextId: URIO[BrokerRepository, Long] =
+  def getNextId[R: Tag]: URIO[BrokerRepository[R], Long] =
     ZIO.accessM(_.get.getNextId)
 }

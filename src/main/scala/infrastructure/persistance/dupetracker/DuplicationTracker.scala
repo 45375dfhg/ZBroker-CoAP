@@ -34,6 +34,12 @@ class DuplicationTracker[A](val fleeting: TSet[A]) extends DuplicationTrackerRep
       } yield b
     }
 
+  /**
+   * A small helper function to access the fleeting set's size.
+   * @return The size of the fleeting set at the given time.
+   */
+  def size: UIO[Int] =
+    fleeting.size.commit
 }
 
 object DuplicationTracker {

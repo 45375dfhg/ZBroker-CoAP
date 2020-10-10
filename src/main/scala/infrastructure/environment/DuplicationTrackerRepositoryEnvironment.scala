@@ -6,5 +6,5 @@ import zio._
 
 object DuplicationTrackerRepositoryEnvironment {
 
-  def fromSTM[A]: ULayer[DuplicationTrackerRepository[A]] = DuplicationTracker.make[A].commit.toLayer
+  def fromSTM[A: Tag]: ULayer[DuplicationTrackerRepository[A]] = DuplicationTracker.make[A].commit.toLayer
 }

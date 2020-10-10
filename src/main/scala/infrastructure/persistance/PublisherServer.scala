@@ -44,7 +44,7 @@ object PublisherServer {
   /**
    * Publishes the given CoapMessage on the layered Broker.
    */
-  private def publishMessage(m: CoapMessage): URIO[BrokerRepository, Unit] =
+  private def publishMessage(m: CoapMessage): URIO[BrokerRepository[PublisherResponse], Unit] =
     (for {
       path    <- m.getPath
       content <- m.getContent

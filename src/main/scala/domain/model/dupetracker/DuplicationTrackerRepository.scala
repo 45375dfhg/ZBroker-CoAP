@@ -9,11 +9,15 @@ object DuplicationTrackerRepository {
   trait Service[A] {
     def add(element: A): UIO[Boolean]
     def remove(element: A): UIO[Boolean]
+    def size: UIO[Int]
   }
 
-  def add[A](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
+  def add[A: Tag](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
     ZIO.accessM(_.get.add(element))
 
-  def remove[A](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
+  def remove[A: Tag](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
     ZIO.accessM(_.get.remove(element))
+
+  def size[A: Tag]: URIO[DuplicationTrackerRepository[A], Int] =
+    ZIO.accessM(_.get.size)
 }

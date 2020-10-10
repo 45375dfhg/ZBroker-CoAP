@@ -12,13 +12,13 @@ import io.grpc._
 import zio.stream._
 import zio._
 
-class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepository, Any] {
+class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepository[PublisherResponse], Any] {
   import SubscriptionService._
 
-  override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository, Status, PublisherResponse] = {
+  override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, PublisherResponse] = {
 
-    ZStream.fromEffect(BrokerRepository.getNextId).flatMap { id =>
-      ZStream.unwrap(BrokerRepository.getQueue(id).bimap(_ => Status.INTERNAL, q => ZStream.fromTQueue(q).ensuring(BrokerRepository.removeSubscriber(id).ignore)))
+    ZStream.fromEffect(BrokerRepository.getNextId[PublisherResponse]).flatMap { id =>
+      ZStream.unwrap(BrokerRepository.getQueue[PublisherResponse](id).bimap(_ => Status.INTERNAL, q => ZStream.fromTQueue(q).ensuring(BrokerRepository.removeSubscriber[PublisherResponse](id).ignore)))
         .drainFork {
           request.collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized).tap { case (action, paths) => action match {
               case Action.ADD => BrokerRepository.addSubscriberTo(paths, id)

@@ -6,7 +6,6 @@ import domain.model.exception._
 import domain.model.exception.MissingBrokerBucket._
 import domain.model.exception.MissingSubscriber._
 
-import subgrpc.subscription.PublisherResponse
 import zio.stm._
 import zio._
 
@@ -20,13 +19,14 @@ import zio._
  *                      identified by its unique Long value.
  * @param subscribers A TMap which maps each Subscriber to a Set of its subscribed topics
  * @param counter A thread-safe counter that acts as supplier for unique connection ID's.
+ * @tparam R The type of the response to an external subscriber, usually dependent on protobuf
  */
-class TransactionalBroker (
-  val mailboxes: TMap[Long, TQueue[PublisherResponse]],
+class TransactionalBroker[R] (
+  val mailboxes: TMap[Long, TQueue[R]],
   val subscriptions: TMap[String, Set[Long]],
   val subscribers: TMap[Long, Set[String]],
   val counter: TRef[Long]
-) extends BrokerRepository.Service {
+) extends BrokerRepository.Service[R] {
   import TransactionalBroker._
 
   /**
@@ -44,8 +44,8 @@ class TransactionalBroker (
   def addSubscriberTo(topics: Paths, id: Long): UIO[Unit] =
     STM.atomically {
       for {
-        _    <- STM.unlessM(mailboxes.contains(id))(TQueue.unbounded[PublisherResponse] >>= (mailboxes.put(id, _)))
-        keys = topics.map(getPathFromSegments)
+        _    <- STM.unlessM(mailboxes.contains(id))(TQueue.unbounded[R] >>= (mailboxes.put(id, _)))
+        keys =  topics.map(getPathFromSegments)
         _    <- subscribers.merge(id, keys.toSet)(_ union _)
         _    <- STM.foreach_(keys)(key => subscriptions.merge(key, Set(id))(_ union _))
       } yield ()
@@ -63,11 +63,10 @@ class TransactionalBroker (
    * Attempts to get the mailbox (a queue) mapped to the specified ID.
    * <p>
    * TODO: WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
-   * <p>
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */
-  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[PublisherResponse]] = {
+  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[R]] = {
     STM.atomically {
       for {
         bool  <- mailboxes.contains(id)
@@ -86,7 +85,7 @@ class TransactionalBroker (
    * @param uriPath An URI path which represents the topic to which the message is addressed.
    * @param msg     The message - already converted into the PublisherResponse format.
    */
-  def pushMessageTo(uriPath: Segments, msg: PublisherResponse): UIO[Unit] =
+  def pushMessageTo(uriPath: Segments, msg: R): UIO[Unit] =
     STM.atomically {
       for {
         routes <- STM.succeed(TransactionalBroker.getSubPaths(uriPath))
@@ -94,7 +93,7 @@ class TransactionalBroker (
         _      <- STM.foreach_(set) { key =>
           for {
             queueM <- mailboxes.get(key)
-            queue  <- queueM.fold(TQueue.unbounded[PublisherResponse])(STM.succeed(_))
+            queue  <- queueM.fold(TQueue.unbounded[R])(STM.succeed(_))
             _      <- queue.offer(msg)
           } yield ()
         }
@@ -140,10 +139,10 @@ class TransactionalBroker (
       for {
         paths <- STM.succeed(topics.map(getPathFromSegments))
         _     <- STM.foreach_(paths) { path =>
-                   STM.whenM(subscriptions.get(path).map(_.fold(false)(_.contains(id)))) {
-                     subscriptions.merge(path, Set(id))(_ diff _)
-                   }
-                 }
+          STM.whenM(subscriptions.get(path).map(_.fold(false)(_.contains(id)))) {
+            subscriptions.merge(path, Set(id))(_ diff _)
+          }
+        }
       } yield ()
     }
 
@@ -166,9 +165,9 @@ object TransactionalBroker {
   /**
    * Creates a STM of a TransactionalBroker.
    */
-  def make: USTM[TransactionalBroker] =
+  def make[R]: USTM[TransactionalBroker[R]] =
     for {
-      buckets <- TMap.empty[Long, TQueue[PublisherResponse]]
+      buckets <- TMap.empty[Long, TQueue[R]]
       topics  <- TMap.empty[String, Set[Long]]
       subs    <- TMap.empty[Long, Set[String]]
       counter <- TRef.make(0L)

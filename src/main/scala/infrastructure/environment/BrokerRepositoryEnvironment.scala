@@ -7,5 +7,5 @@ import zio._
 
 object BrokerRepositoryEnvironment {
 
-  val fromSTM : ULayer[BrokerRepository] = TransactionalBroker.make.commit.toLayer
+  def fromSTM[R: Tag]: ULayer[BrokerRepository[R]] = TransactionalBroker.make[R].commit.toLayer
 }
