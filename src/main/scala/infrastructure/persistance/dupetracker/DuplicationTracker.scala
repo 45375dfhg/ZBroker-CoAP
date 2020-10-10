@@ -1,8 +1,12 @@
+package infrastructure.persistance.dupetracker
+
+import domain.model.dupetracker._
+
 import zio._
 import zio.stm._
 
 
-class DuplicationTracker[A](val fleeting: TSet[A]) {
+class DuplicationTracker[A](val fleeting: TSet[A]) extends DuplicationTrackerRepository.Service[A] {
 
   def add(element: A): UIO[Boolean] =
     STM.atomically {

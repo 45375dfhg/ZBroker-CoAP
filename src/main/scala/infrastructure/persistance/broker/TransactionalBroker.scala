@@ -2,10 +2,10 @@ package infrastructure.persistance.broker
 
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository._
-import domain.model.exception.{MissingBrokerBucket, MissingSubscriber}
+import domain.model.exception._
 import domain.model.exception.MissingBrokerBucket._
-import domain.model.exception.MissingSubscriber.MissingSubscriber
-import infrastructure.persistance.broker.TransactionalBroker.getPathFromSegments
+import domain.model.exception.MissingSubscriber._
+
 import subgrpc.subscription.PublisherResponse
 import zio.stm._
 import zio._
@@ -27,6 +27,7 @@ class TransactionalBroker (
   val subscribers: TMap[Long, Set[String]],
   val counter: TRef[Long]
 ) extends BrokerRepository.Service {
+  import TransactionalBroker._
 
   /**
    * Increments and then returns the next ID while being thread-safe.

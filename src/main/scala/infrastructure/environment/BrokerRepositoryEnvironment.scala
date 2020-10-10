@@ -1,8 +1,8 @@
 package infrastructure.environment
 
-import domain.model.broker.BrokerRepository.BrokerRepository
-import infrastructure.persistance.broker.TransactionalBroker
-import zio.ULayer
+import domain.model.broker.BrokerRepository._
+import infrastructure.persistance.broker._
+import zio._
 
 
 object BrokerRepositoryEnvironment {
