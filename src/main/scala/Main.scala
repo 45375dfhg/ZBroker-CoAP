@@ -1,8 +1,6 @@
 
 import infrastructure.persistance._
-
 import zio._
-
 
 object Main extends App {
 
