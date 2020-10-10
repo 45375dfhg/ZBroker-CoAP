@@ -10,6 +10,7 @@ import subgrpc.subscription.PublisherResponse
 import zio._
 import zio.console.putStrLn
 
+// TODO: This needs to proper generalized constructor
 object SubscriberServer {
 
   def port = 8980 // TODO: Needs to be part of the config
