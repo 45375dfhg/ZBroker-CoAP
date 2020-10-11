@@ -17,6 +17,7 @@ object BrokerRepository {
     def addSubscriberTo(topics: Paths, id: Long): UIO[Unit]
     def removeSubscriber(id: Long): IO[MissingSubscriber, Unit]
     def getSubscribers(topic: String): UIO[Option[Set[Long]]]
+    def getSubscribers(topic: Segments): UIO[Option[Set[Long]]]
     def removeSubscriptions(topics: Paths, id: Long): UIO[Unit]
     def getNextId: UIO[Long]
 
@@ -55,6 +56,9 @@ object BrokerRepository {
     ZIO.accessM(_.get.removeSubscriber(id))
 
   def getSubscribers[R: Tag](topic: String): URIO[BrokerRepository[R], Option[Set[Long]]] =
+    ZIO.accessM(_.get.getSubscribers(topic))
+
+  def getSubscribers[R: Tag](topic: Segments): URIO[BrokerRepository[R], Option[Set[Long]]] =
     ZIO.accessM(_.get.getSubscribers(topic))
 
   def removeSubscriptions[R: Tag](topics: Paths, id: Long): URIO[BrokerRepository[R], Unit] =

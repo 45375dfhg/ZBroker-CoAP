@@ -59,6 +59,14 @@ class TransactionalBroker[R] (
   def getSubscribers(topic: String): UIO[Option[Set[Long]]] =
     subscriptions.get(topic).commit
 
+  def getSubscribers(topic: Segments): UIO[Option[Set[Long]]] =
+    STM.atomically {
+      for {
+        k <- STM.succeed(getPathFromSegments(topic))
+        r <- subscriptions.contains(k) >>= (if (_) subscriptions.get(k) else STM.none)
+      } yield r
+    }
+
   /**
    * Attempts to get the mailbox (a queue) mapped to the specified ID.
    * <p>
