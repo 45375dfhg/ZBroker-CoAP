@@ -5,6 +5,14 @@ import zio.{Chunk, IO, NonEmptyChunk}
 
 object ChunkExtension {
 
+  implicit class ChunkIntExtension(chunk: Chunk[Byte]) {
+    val removeLeadingZeros: Chunk[Byte] =
+      chunk.headOption match {
+        case Some(value) => if (value == 0) chunk.tail.removeLeadingZeros else chunk
+        case None        => Chunk.empty
+      }
+  }
+
   implicit class ChunkExtension[A](chunk: Chunk[A]) {
     def leftPadTo(len: Int, element: A): Chunk[A] =
       Chunk.fill(len - chunk.size)(element) ++ chunk

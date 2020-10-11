@@ -205,7 +205,7 @@ package object fields {
 
   @newtype class CoapOptionValue private(val content: CoapOptionValueContent) {
     def toByteChunk: Chunk[Byte] = content match {
-      case c : IntCoapOptionValueContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact)
+      case c : IntCoapOptionValueContent     => Chunk.fromByteBuffer(ByteBuffer.allocate(4).putInt(c.value).compact).removeLeadingZeros
       case c : StringCoapOptionValueContent  => Chunk.fromArray(c.value.getBytes(StandardCharsets.UTF_8))
       case c : OpaqueCoapOptionValueContent  => c.value
       case EmptyCoapOptionValueContent       => Chunk.empty
