@@ -22,10 +22,10 @@ import zio._
  * @tparam R The type of the response to an external subscriber, usually dependent on protobuf
  */
 class TransactionalBroker[R] (
-  val mailboxes: TMap[Long, TQueue[R]],
-  val subscriptions: TMap[String, Set[Long]],
-  val subscribers: TMap[Long, Set[String]],
-  val counter: TRef[Long]
+  private val mailboxes: TMap[Long, TQueue[R]],
+  private val subscriptions: TMap[String, Set[Long]],
+  private val subscribers: TMap[Long, Set[String]],
+  private val counter: TRef[Long]
 ) extends BrokerRepository.Service[R] {
   import TransactionalBroker._
 
@@ -146,6 +146,18 @@ class TransactionalBroker[R] (
       } yield ()
     }
 
+  /*
+   * The following functions provide access to different lengths and sizes of the Broker.
+   * These functions primarily exist for testing.
+   */
+  def subscriptionSizeOf(key: String): UIO[Int] = subscriptions.get(key).map(_.size).commit
+  def subscriberElements(key: Long): UIO[Int]   = subscribers.get(key).map(_.size).commit
+  def mailboxOf(key: Long): UIO[Int] = mailboxes.get(key).flatMap(_.fold(STM.succeed(0))(_.size)).commit
+
+  def sizeMailboxes     = mailboxes.size.commit
+  def sizeSubscriptions = subscriptions.size.commit
+  def sizeSubscribers   = subscribers.size.commit
+  def sizeCounter       = counter.get.commit
 }
 
 object TransactionalBroker {

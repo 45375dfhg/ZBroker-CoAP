@@ -34,6 +34,6 @@ object CoapBody {
       payload  <- CoapPayload.fromWithExcluding(body, CoapPayloadMediaType.fromOption(options), offset)
     } yield CoapBody(token, options, payload)
 
-    val empty = CoapBody(None, None, None)
+  val empty = CoapBody(None, None, None)
 }
 

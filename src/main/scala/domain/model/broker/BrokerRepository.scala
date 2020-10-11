@@ -19,6 +19,15 @@ object BrokerRepository {
     def getSubscribers(topic: String): UIO[Option[Set[Long]]]
     def removeSubscriptions(topics: Paths, id: Long): UIO[Unit]
     def getNextId: UIO[Long]
+
+    def subscriptionSizeOf(key: String): UIO[Int]
+    def subscriberElements(key: Long): UIO[Int]
+    def mailboxOf(key: Long): UIO[Int]
+
+    def sizeMailboxes: UIO[Int]
+    def sizeSubscriptions: UIO[Int]
+    def sizeSubscribers: UIO[Int]
+    def sizeCounter: UIO[Long]
   }
 
   /**
@@ -53,4 +62,25 @@ object BrokerRepository {
 
   def getNextId[R: Tag]: URIO[BrokerRepository[R], Long] =
     ZIO.accessM(_.get.getNextId)
+
+  def subscriptionSizeOf[R: Tag](key: String): URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.subscriptionSizeOf(key))
+
+  def subscriberElements[R: Tag](key: Long): URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.subscriberElements(key))
+
+  def mailboxOf[R: Tag](key: Long): URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.mailboxOf(key))
+
+  def sizeMailboxes[R: Tag]: URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.sizeMailboxes)
+
+  def sizeSubscriptions[R: Tag]: URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.sizeSubscriptions)
+
+  def sizeSubscribers[R: Tag]: URIO[BrokerRepository[R], Int] =
+    ZIO.accessM(_.get.sizeSubscribers)
+
+  def sizeCounter[R: Tag]: URIO[BrokerRepository[R], Long] =
+    ZIO.accessM(_.get.sizeCounter)
 }
