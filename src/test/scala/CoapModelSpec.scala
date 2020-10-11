@@ -59,20 +59,27 @@ object CoapModelSpec extends DefaultRunnableSpec {
   // marker but no load
   val missing_load = Chunk[Byte](80,3,18,54,-64,-1)
 
+  //
+  def constructDeconstructEquality(chunk: Chunk[Byte]) =
+    CoapMessage.fromDatagram(chunk).map(_.toByteChunk).map(r => assert(r)(hasSameElements(chunk)))
+
   val testEnvironment = Random.live ++ Sized.live(1)
 
   override def spec =
-    suite("CoAP Model")(
+    suite("CoAP Model Serial")(
       suite("CoAP Header")(
-        testM("correctly generate N headers from random valid chunks") {
-          checkM(Gen.listOfN(100)(generateHeader))(messages => ZIO.foreach(messages)(CoapHeader.fromDatagram).as(assertCompletes))
-        },
-        testM("test reset header value")(CoapHeader.fromDatagram(reset).as(assertCompletes)),
-        testM("test reset header value")(CoapHeader.fromDatagram(ackno).as(assertCompletes)),
-        testM("wrong protocol detected")(CoapHeader.fromDatagram(wrongProtocol).flip.as(assertCompletes)),
-        testM("wrong header length detected")(CoapHeader.fromDatagram(wrongHeaderLength).flip.as(assertCompletes)),
-        testM("empty datagram detected")(CoapHeader.fromDatagram(Chunk[Byte]()).flip.as(assertCompletes)),
-        testM("right size but empty detected")(CoapHeader.fromDatagram(Chunk[Byte](0, 0, 0, 0)).flip.as(assertCompletes)),
+        suite("successes")(
+          testM("correctly generate N headers from random valid chunks") {
+            checkM(Gen.listOfN(100)(generateHeader))(messages => ZIO.foreach(messages)(CoapHeader.fromDatagram).as(assertCompletes))
+          },
+          testM("test reset header value")(CoapHeader.fromDatagram(reset).as(assertCompletes)),
+          testM("test reset header value")(CoapHeader.fromDatagram(ackno).as(assertCompletes))),
+        suite("failures")(
+          testM("wrong protocol detected")(CoapHeader.fromDatagram(wrongProtocol).flip.as(assertCompletes)),
+          testM("wrong header length detected")(CoapHeader.fromDatagram(wrongHeaderLength).flip.as(assertCompletes)),
+          testM("empty datagram detected")(CoapHeader.fromDatagram(Chunk[Byte]()).flip.as(assertCompletes)),
+          testM("right size but empty detected")(CoapHeader.fromDatagram(Chunk[Byte](0, 0, 0, 0)).flip.as(assertCompletes)),
+        )
       ),
       suite("CoAP Body")(
         suite("GET")(
@@ -90,10 +97,15 @@ object CoapModelSpec extends DefaultRunnableSpec {
           },
           testM("missing load detected")(CoapMessage.fromDatagram(missing_load).flip.as(assertCompletes)),
         )
+      ),
+      suite("deserialization")(
+        testM("GET CON")(constructDeconstructEquality(con_get)),
+        testM("GET CON BLOCK")(constructDeconstructEquality(con_get_block)),
+        testM("GET NON BLOCK")(constructDeconstructEquality(non_get_block)),
+        testM("uri-path GET")(constructDeconstructEquality(uri_path_get)),
+        testM("uri-path PUT ascii")(constructDeconstructEquality(uri_path_put_ascii)),
       )
     ).provideCustomLayerShared(testEnvironment)
 
 
 }
-
-// testM("test reset and acknowledge header values")(CoapHeader.fromDatagram(reset).as(assertCompletes))

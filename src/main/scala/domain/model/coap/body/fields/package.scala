@@ -272,38 +272,10 @@ package object fields {
   @newtype case class NoCacheKey(value: Boolean)
   @newtype case class Repeatable(value: Boolean)
 
+  // TODO: Refactor this and other cases into its own utility package
   /**
    * A small helper functions that takes a Chunk[Byte] and merges the first two Bytes into an Int
    * There is no previous check on the index access validity so an unhandled error is possible.
    */
   private val merge = (c: Chunk[Byte]) => ((c(0) << 8) & 0xFF) | (c(1) & 0xFF)
-
-  // REMOVE BELOW
-  // REMOVE BELOW
-  // REMOVE BELOW
-  // REMOVE BELOW
-
-  @newtype class CoapOptionExtendedDelta private(val value: Int)
-
-  object CoapOptionExtendedDelta {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedDelta] =
-    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small delta value.
-    // The extension value must be greater than 12 which is a highest non special construct value.
-      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionDelta(s"$value"))
-  }
-
-  @newtype class CoapOptionExtendedLength private(val value: Int)
-
-  object CoapOptionExtendedLength {
-    def apply(value: Int): IO[MessageFormatError, CoapOptionExtendedLength] =
-    // #rfc7252 accepts either 8 or 16 bytes as an extension to the small length value.
-    // The extension value must be greater than 12 which is a highest non special construct value.
-      IO.cond(13 to 65804 contains value, value.coerce, InvalidOptionLength(s"$value"))
-  }
-
-  @newtype case class CoapOptionOffset(value: Int)
-
-  object CoapOptionOffset {
-    implicit val numeric: Numeric[CoapOptionOffset] = deriving
-  }
 }
