@@ -19,8 +19,8 @@ val zio = Seq(
 )
 
 val zio_nio = Seq(
-    "dev.zio" %% "zio-nio"      % "1.0.0-RC9",
-    "dev.zio" %% "zio-nio-core" % "1.0.0-RC9",
+    "dev.zio" %% "zio-nio"      % "1.0.0-RC10",
+    "dev.zio" %% "zio-nio-core" % "1.0.0-RC10",
 )
 
 val zio_grpc = Seq(
@@ -53,5 +53,5 @@ scalacOptions ++= Seq(
     "-Ywarn-value-discard",
     "-Ywarn-unused",
     "-Ymacro-annotations", // required for NewType in 2.12.1+
-    // "-language:implicitConversions" // used to e.g. extend the PublisherResponse object
+    "-language:implicitConversions" // used to e.g. extend the PublisherResponse object
 )

@@ -13,9 +13,9 @@ object EndpointFromSocket {
   val datagramChannel: ZIO[ConfigRepository with Console, GatewayError, DatagramChannel] =
     (for {
       port          <- ConfigRepository.getPrimaryUDPPort
-      socketAddress <- SocketAddress.inetSocketAddress(port.value).option
+      socketAddress <- SocketAddress.inetSocketAddress(port.value).optional
       server        <- DatagramChannel.open
-      channel       <- server.bind(socketAddress)
-    } yield channel).refineToOrDie[GatewayError]
+      _             <- server.bind(socketAddress)
+    } yield server).refineToOrDie[GatewayError]
 
 }
