@@ -22,7 +22,7 @@ package object fields {
       case two  if 269 to 65804 contains two  => 2
     }
 
-    def toOptionHeader: Int = getHeaderByte(value)
+    def toOptionHeader: Int = getHeaderByte(value) << 4
 
     def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(value)
   }
