@@ -33,13 +33,16 @@ object PublisherServer {
    * The core method which is applied to each element on the incoming publisher stream.
    * @param streamChunk A tuple which might contain a SocketAddress and definitely contains a Chunk[Byte].
    */
-  private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) =
+  private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) = {
+    IO.succeed(streamChunk._2).tap(a => putStrLn(a.toString)) *>
     (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
+      .tap(t => putStrLn(t._2.toString))
       .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
       .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
       .map(isolateMessage).collect(UnsharablePayload)(sendableMessage)
       .tap(publishMessage)
       .ignore
+  }
 
   /**
    * Publishes the given CoapMessage on the layered Broker.

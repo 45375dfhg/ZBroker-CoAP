@@ -22,9 +22,9 @@ package object fields {
       case two  if 269 to 65804 contains two  => 2
     }
 
-    def toOptionHeader: Int = getHeaderByte(this.value)
+    def toOptionHeader: Int = getHeaderByte(value)
 
-    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this.value)
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(value)
   }
 
   object CoapOptionDelta {
@@ -58,9 +58,9 @@ package object fields {
       case two  if 269 to 65804 contains two  => 2
     }
 
-    def toOptionHeader: Int = getHeaderByte(this.value)
+    def toOptionHeader: Int = getHeaderByte(value)
 
-    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(this.value)
+    def toOptionBodyExt: Chunk[Byte] = getExtensionFrom(value)
   }
 
   object CoapOptionLength {

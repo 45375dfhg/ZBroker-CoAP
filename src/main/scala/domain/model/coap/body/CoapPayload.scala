@@ -1,5 +1,7 @@
 package domain.model.coap.body
 
+import java.nio.charset.StandardCharsets
+
 import domain.model.coap.body.fields._
 import domain.model.exception._
 import utility.classExtension.ChunkExtension.ChunkExtension
@@ -19,7 +21,7 @@ final case class TextCoapPayload private(value: String) extends CoapPayload
 
 object TextCoapPayload {
   def apply(chunk: Chunk[Byte]): TextCoapPayload =
-    new TextCoapPayload(chunk.map(_.toChar).mkString)
+    new TextCoapPayload(new String(chunk.toArray, StandardCharsets.UTF_8))
 }
 
 final case class UnknownPayload (value: Chunk[Byte]) extends CoapPayload
