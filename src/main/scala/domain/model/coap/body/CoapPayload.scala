@@ -11,7 +11,7 @@ import scala.collection.immutable.HashMap
 
 abstract class CoapPayload {
   def toByteChunk: Chunk[Byte] = this match {
-    case p : TextCoapPayload => Chunk.fromArray(p.value.map(_.toByte).toArray)
+    case p : TextCoapPayload => CoapPayload.marker +: Chunk.fromArray(p.value.getBytes(StandardCharsets.UTF_8))
     case _ => Chunk[Byte]()
   }
 }
