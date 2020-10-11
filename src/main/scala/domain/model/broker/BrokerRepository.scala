@@ -3,7 +3,6 @@ package domain.model.broker
 
 import domain.model.exception.MissingBrokerBucket.MissingBrokerBucket
 import domain.model.exception.MissingSubscriber.MissingSubscriber
-import subgrpc.subscription.PublisherResponse
 import zio._
 import zio.stm.TQueue
 

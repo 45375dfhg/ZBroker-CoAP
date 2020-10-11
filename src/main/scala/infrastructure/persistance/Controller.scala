@@ -9,7 +9,7 @@ import zio.console.putStrLn
 object Controller {
 
   def boot(args: List[String]) = {
-    val profile = args.headOption.fold("")(identity)
+    // val profile = args.headOption.fold("")(identity)
 
     putStrLn("[Config] Applying config from memory. Pass 'console' as an argument to set config manually.").toLayer ++
       getEnvironment(ConfigRepositoryEnvironment.fromMemory)
