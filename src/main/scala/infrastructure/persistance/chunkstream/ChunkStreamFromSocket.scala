@@ -1,5 +1,7 @@
 package infrastructure.persistance.chunkstream
 
+import java.io.IOException
+
 import domain.model.config._
 import domain.model.config.ConfigRepository._
 import domain.model.chunkstream._
@@ -21,7 +23,9 @@ object ChunkStreamFromSocket extends ChunkStreamRepository.Service {
         origin <- server.receive(buffer)
         _      <- buffer.flip
         chunk  <- buffer.getChunk()
-      } yield (origin, chunk)).refineToOrDie[GatewayError]
+      } yield (origin, chunk)).refineOrDie {
+        case e : IOException => SystemError("IOException", e)
+      }
     }
 
 }

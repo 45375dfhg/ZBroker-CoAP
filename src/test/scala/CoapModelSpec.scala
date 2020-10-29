@@ -69,7 +69,7 @@ object CoapModelSpec extends DefaultRunnableSpec {
     suite("CoAP Model Serial")(
       suite("CoAP Header")(
         suite("successes")(
-          testM("correctly generate N headers from random valid chunks") {
+          testM("correctly generate 100 headers from random valid chunks") {
             checkM(Gen.listOfN(100)(generateHeader))(messages => ZIO.foreach(messages)(CoapHeader.fromDatagram).as(assertCompletes))
           },
           testM("test reset header value")(CoapHeader.fromDatagram(reset).as(assertCompletes)),

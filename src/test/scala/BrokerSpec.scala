@@ -14,8 +14,8 @@ object BrokerSpec extends DefaultRunnableSpec {
 
   override def spec =
     suite("TransactionalBroker")(
-      suite("subscriptions")(
-        testM("topics") {
+      suite("topics")(
+        testM("add subscriber") {
           for {
             _ <- BrokerRepository.addSubscriberTo[PublisherResponse](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
             s <- BrokerRepository.getSubscribers[PublisherResponse]("rootnodeleaf").map(a => a.fold(-1)(_.size))

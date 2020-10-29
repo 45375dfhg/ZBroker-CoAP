@@ -36,7 +36,7 @@ package object fields {
       CoapType((b & 0x30) >> 4)
 
     val acknowledge: CoapType = 2.coerce
-    val reset: CoapType = 3.coerce
+    val reset: CoapType       = 3.coerce
   }
 
   @newtype class CoapTokenLength private(val value: Int) {
