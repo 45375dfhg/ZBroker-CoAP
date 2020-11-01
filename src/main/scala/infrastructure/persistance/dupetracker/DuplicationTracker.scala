@@ -6,7 +6,7 @@ import zio._
 import zio.stm._
 
 
-class DuplicationTracker[A](val fleeting: TSet[A]) extends DuplicationTrackerRepository.Service[A] {
+class DuplicationTracker[A] private (val fleeting: TSet[A]) extends DuplicationTrackerRepository.Service[A] {
 
   /**
    * Adds an element to the set if it is not already included.

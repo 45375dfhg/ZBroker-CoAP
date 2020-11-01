@@ -42,7 +42,7 @@ package object fields {
       }
 
     // ... while 13 and 14 lead to special constructs via ext8 and ext16
-    private def extend(coapOptionDelta: CoapOptionDelta, body: Chunk[Byte]): ZIO[Any, GatewayError, CoapOptionDelta] =
+    private def extend(coapOptionDelta: CoapOptionDelta, body: Chunk[Byte]): IO[GatewayError, CoapOptionDelta] =
       coapOptionDelta.value match {
         case basic if 0 to 12 contains basic => IO.succeed(coapOptionDelta)
         case 13 => body.takeExactly(1).map(_.head) >>= (n => CoapOptionDelta(n + 13)) // TODO: head.toInt?

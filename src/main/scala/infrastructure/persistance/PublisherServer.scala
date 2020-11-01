@@ -34,7 +34,7 @@ object PublisherServer {
    * @param streamChunk A tuple which might contain a SocketAddress and definitely contains a Chunk[Byte].
    */
   private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) = {
-    IO.succeed(streamChunk._2).tap(a => putStrLn(a.toString)) *>
+    // IO.succeed(streamChunk._2).tap(a => putStrLn(a.toString)) *>
     (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
       .tap(t => putStrLn(t._2.toString))
       .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
@@ -67,7 +67,7 @@ object PublisherServer {
             { case (address, acknowledgment) => sendMessage(address, acknowledgment) }
       }.ignore
     }
-
+  // TODO: ABOVE SHOULD PUSH THE MISSING ADDRESS TO AN OUTER COLLECT!
   /**
    * If the CoapMessage was unsuccessfully parsed but contains a CoapId and the origin is known, this function
    * will send a reset message to the message's origin. If the parsing was successful or the address is missing,
@@ -97,7 +97,7 @@ object PublisherServer {
   private def sendableMessage: PartialValidMessage = {
     case msg @ CoapMessage(header, _) if header.coapCodePrefix.value == 0 && header.coapCodeSuffix.value == 3 => msg
   }
-
+  //TODO: ABOVE NEEDS TO CHECK FOR URI AND PAYLOAD!
   /**
    * Drops all unsuccessfully parsed CoapMessages.
    */

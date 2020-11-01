@@ -48,7 +48,7 @@ object CoapPayload {
     body.dropExactly(offset).flatMap(load => (load, load.headOption) match {
       case (load, Some(byte)) => if (byte == marker && load.tail.nonEmpty) IO.some(CoapPayload.fromWith(load.tail, format))
                                  else IO.fail(InvalidPayloadMarker)
-      case (_, None)          => IO.none
+      case (_, None)          => IO.none // technically an error?
     })
 
   private def fromWith(chunk: Chunk[Byte], format: CoapPayloadMediaType): CoapPayload =

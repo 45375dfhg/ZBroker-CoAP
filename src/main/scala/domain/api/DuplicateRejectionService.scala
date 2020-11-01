@@ -19,9 +19,9 @@ object DuplicateRejectionService {
    */
   def addAndDeleteAfter[A: Tag](element: A, n: Int = 145): URIO[DuplicationTrackerRepository[A] with Clock, Boolean] =
     for {
-      already <- DuplicationTrackerRepository.add(element)
-      _       <- ZIO.unless(already)(DuplicationTrackerRepository.remove(element).delay(n.seconds).fork)
-    } yield already
+      b <- DuplicationTrackerRepository.add(element)
+      _ <- ZIO.when(b)(DuplicationTrackerRepository.remove(element).delay(n.seconds).fork)
+    } yield b
 
   def size[A: Tag]: URIO[DuplicationTrackerRepository[A], Int] =
     DuplicationTrackerRepository.size
