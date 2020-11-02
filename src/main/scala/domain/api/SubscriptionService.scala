@@ -16,25 +16,20 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
   import SubscriptionService._
 
   override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, PublisherResponse] = {
+    type PR = PublisherResponse
 
-    ZStream.fromEffect(BrokerRepository.getNextId[PublisherResponse]).flatMap { id =>
-      ZStream.unwrap(BrokerRepository.getQueue[PublisherResponse](id).bimap(_ => Status.INTERNAL, q => ZStream.fromTQueue(q).ensuring(BrokerRepository.removeSubscriber[PublisherResponse](id).ignore)))
-        .drainFork {
-          request.collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized).tap { case (action, paths) => action match {
-              case Action.ADD => BrokerRepository.addSubscriberTo(paths, id)
+    ZStream.fromEffect(BrokerRepository.getNextId[PR]).flatMap { id =>
+      ZStream.unwrap(
+        BrokerRepository.getQueue[PR](id).bimap(
+          _ => Status.INTERNAL,
+          q => ZStream.fromTQueue(q).ensuring(BrokerRepository.removeSubscriber[PR](id).ignore))
+      ).drainFork { // TODO: Really just drop elements?
+          request.collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized).tap {
+            case (action, paths) => action match {
+              case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
               case Action.REMOVE => BrokerRepository.removeSubscriptions(paths, id)
             }
           }
-//          for {
-//            _ <- request
-//              .collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized) // TODO: Really just drop elements?
-//              // IF COLLECT RETURNS NOTHING => NO QUEUE => OTHER STREAM FAILS!
-//              .tap { case (action, paths) => action match {
-//                case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
-//                case Action.REMOVE => BrokerRepository.removeSubscriptions(paths, id)
-//              }
-//              }
-//          } yield ()
         }
     }
   }

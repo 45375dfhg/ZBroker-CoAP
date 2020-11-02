@@ -6,6 +6,7 @@ import domain.model.coap.header.fields._
 import utility.PartialTypes._
 import zio.Chunk
 
+//TODO: refactor?
 object ResponseService {
 
   def getAckMessage(msg: CoapMessage): Chunk[Byte] =
