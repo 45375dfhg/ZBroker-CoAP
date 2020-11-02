@@ -5,11 +5,13 @@ import domain.api.ResponseService._
 import domain.api._
 import domain.model.broker.BrokerRepository._
 import domain.model.broker._
+import domain.model.chunkstream.ChunkStreamRepository.Channel
 import domain.model.chunkstream._
 import domain.model.coap._
 import domain.model.coap.header.fields._
 import domain.model.config.ConfigRepository
 import domain.model.exception._
+import domain.model.sender.MessageSenderRepository
 import domain.model.sender.MessageSenderRepository._
 import utility.PartialTypes._
 import utility.classExtension.PublisherResponseExtension._
@@ -45,10 +47,29 @@ object PublisherServer {
   }
 
   private def operation(element: (Option[SocketAddress], Chunk[Byte])) = {
-    val message = CoapDeserializerService.parseCoapMessageWithoutErr(element._2)
+    CoapDeserializerService.parseCoapMessageWithoutErr(element._2).flatMap {
+      case Left(id) => attemptReset(element._1, id)
+      case Right(v) =>
+    }.ignore
+
   }
 
+  // TODO: MessageSenderRepository needs a service!
+  private def attemptReset(address: Option[SocketAddress], id: Option[CoapId]) =
+    (address, id) match {
+      case (Some(addr), Some(id)) => MessageSenderRepository.sendMessage(addr, ResponseService.getResetMessage(id))
+      case (None, _)              => IO.fail(MissingAddress)
+      case (Some(_), None)        => IO.fail(MissingCoapId)
+    }
 
+  private def sendAcknowledgment(streamChunk: (Option[SocketAddress], CoapMessage)) =
+    streamChunk match {
+      case (address, msg) => {
+        IO.fromOption(address).orElseFail(MissingAddress) <*>
+          IO.cond(msg.isConfirmable, getAcknowledgment(msg), NoResponseAvailable) >>=
+          { case (address, acknowledgment) => sendMessage(address, acknowledgment) }
+      }.ignore
+    }
 
   /**
    * Publishes the given CoapMessage on the layered Broker.
