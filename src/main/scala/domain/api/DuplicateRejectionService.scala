@@ -3,9 +3,9 @@ package domain.api
 import domain.model.dupetracker.DuplicationTrackerRepository
 import domain.model.dupetracker.DuplicationTrackerRepository._
 
-import zio.clock.Clock
+import zio.clock._
 import zio.duration._
-import zio.{Tag, URIO, ZIO}
+import zio._
 
 object DuplicateRejectionService {
 

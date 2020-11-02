@@ -44,6 +44,12 @@ object PublisherServer {
       .ignore
   }
 
+  private def operation(element: (Option[SocketAddress], Chunk[Byte])) = {
+    val message = CoapDeserializerService.parseCoapMessageWithoutErr(element._2)
+  }
+
+
+
   /**
    * Publishes the given CoapMessage on the layered Broker.
    */

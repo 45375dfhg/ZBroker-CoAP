@@ -21,7 +21,7 @@ import zio._
  * @param counter A thread-safe counter that acts as supplier for unique connection ID's.
  * @tparam R The type of the response to an external subscriber, usually dependent on protobuf
  */
-class TransactionalBroker[R] (
+class TransactionalBroker[R] private (
   private val mailboxes: TMap[Long, TQueue[R]],
   private val subscriptions: TMap[String, Set[Long]],
   private val subscribers: TMap[Long, Set[String]],

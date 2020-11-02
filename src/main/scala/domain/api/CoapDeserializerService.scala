@@ -12,7 +12,7 @@ object CoapDeserializerService {
   def parseCoapMessage(chunk: Chunk[Byte]): UIO[Either[(GatewayError, Option[CoapId]), CoapMessage]] =
     CoapMessage.fromDatagram(chunk).flatMapError(err => UIO.succeed(err) <*> CoapId.recoverFrom(chunk)).either
 
-  def parseCoapMessageWithoutErr(chunk: Chunk[Byte]): UIO[Either[UIO[Option[CoapId]], CoapMessage]] =
-    CoapMessage.fromDatagram(chunk).orElseFail(CoapId.recoverFrom(chunk)).either
+  def parseCoapMessageWithoutErr(chunk: Chunk[Byte]): UIO[Either[Option[CoapId], CoapMessage]] =
+    CoapMessage.fromDatagram(chunk).flatMapError(_ => CoapId.recoverFrom(chunk)).either
 }
 
