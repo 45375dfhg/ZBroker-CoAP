@@ -30,6 +30,12 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
     }
   }
 
+  val hasPath: Boolean =
+    this.body.options match {
+      case Some(options) => options.value.find(_.coapOptionNumber.value == 11).isDefined
+      case _             => false
+    }
+
   val getContent: IO[SuccessfulFailure, String] = {
     this.body.payload match {
       case Some(payload) => payload match {

@@ -9,9 +9,11 @@ import zio._
 
 
 final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal {
-  def offset = value.foldLeft(0) { (acc, c) =>
-    acc + c.coapOptionDelta.offset + c.coapOptionLength.offset + c.coapOptionLength.value + 1
-  }
+
+  def offset: Int =
+    value.foldLeft(0) { (acc, c) =>
+      acc + c.coapOptionDelta.offset + c.coapOptionLength.offset + c.coapOptionLength.value + 1
+    }
 
   // TODO: Wrong place?
   def payloadMediaType: CoapPayloadMediaType =

@@ -10,6 +10,7 @@ import domain.model.chunkstream._
 import domain.model.coap._
 import domain.model.coap.header.fields._
 import domain.model.config.ConfigRepository
+import domain.model.exception.UnsharablePayload.UnsharablePayload
 import domain.model.exception._
 import domain.model.sender.MessageSenderRepository
 import domain.model.sender.MessageSenderRepository._
@@ -28,117 +29,44 @@ object PublisherServer {
   val make =
     for {
       n <- ConfigRepository.getStreamFiberAmount <* putStrLn("[PUB] PublisherServer  loading Config. Starting ...")
-      _ <- ChunkStreamRepository.getChunkStream.mapMParUnordered(n.value)(serverRoutine).runDrain
+      _ <- ChunkStreamRepository.getChunkStream.mapMParUnordered(n.value)(operation).runDrain
     } yield ()
 
-  /**
-   * The core method which is applied to each element on the incoming publisher stream.
-   * @param streamChunk A tuple which might contain a SocketAddress and definitely contains a Chunk[Byte].
-   */
-  private def serverRoutine(streamChunk: (Option[SocketAddress], Chunk[Byte])) = {
-    // IO.succeed(streamChunk._2).tap(a => putStrLn(a.toString)) *>
-    (UIO.succeed(streamChunk._1) <*> CoapDeserializerService.parseCoapMessage(streamChunk._2))
-      .tap(t => putStrLn(t._2.toString))
-      .collect(MissingCoapId)(messagesAndErrorsWithId).tap(sendReset)
-      .collect(InvalidCoapMessage)(validMessage).tap(sendAcknowledgment) // TODO: ADD PIGGYBACKING BASED ON REQUEST PARAMS
-      .map(isolateMessage).collect(UnsharablePayload)(sendableMessage)
-      .tap(publishMessage)
-      .ignore
-  }
 
-  private def operation(element: (Option[SocketAddress], Chunk[Byte])) = {
+  private def operation(element: (Option[SocketAddress], Chunk[Byte])) =
     CoapDeserializerService.parseCoapMessageWithoutErr(element._2).flatMap {
       case Left(id) => attemptReset(element._1, id)
-      case Right(v) =>
+      case Right(m) => attemptAcknowledgment(element._1, m) *> attemptPublish(m)
     }.ignore
 
-  }
 
   // TODO: MessageSenderRepository needs a service!
   private def attemptReset(address: Option[SocketAddress], id: Option[CoapId]) =
-    (address, id) match {
+    ((address, id) match {
       case (Some(addr), Some(id)) => MessageSenderRepository.sendMessage(addr, ResponseService.getResetMessage(id))
       case (None, _)              => IO.fail(MissingAddress)
       case (Some(_), None)        => IO.fail(MissingCoapId)
-    }
+    }).ignore
 
-  private def sendAcknowledgment(streamChunk: (Option[SocketAddress], CoapMessage)) =
-    streamChunk match {
-      case (address, msg) => {
-        IO.fromOption(address).orElseFail(MissingAddress) <*>
-          IO.cond(msg.isConfirmable, getAcknowledgment(msg), NoResponseAvailable) >>=
-          { case (address, acknowledgment) => sendMessage(address, acknowledgment) }
-      }.ignore
-    }
+  private def attemptAcknowledgment(address: Option[SocketAddress], msg: CoapMessage) =
+    (address match {
+      case None       => IO.fail(MissingAddress)
+      case Some(addr) =>
+        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable) >>= (sendMessage(addr, _))
+    }).ignore
 
-  /**
-   * Publishes the given CoapMessage on the layered Broker.
-   */
-  private def publishMessage(m: CoapMessage): URIO[BrokerRepository[PublisherResponse], Unit] =
+  private def attemptPublish(m: CoapMessage): URIO[BrokerRepository[PublisherResponse], Unit] =
     (for {
+      _       <- isPut(m)
       path    <- m.getPath
       content <- m.getContent
       _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.from(path, content))
     } yield ()).ignore
 
-  /**
-   * This function attempts to derive a SocketAddress from the Option, checks whether the provided message is
-   * to be confirmed and if all attempts and checks are successful, it  sends an acknowledging message to the given address.
-   * If any attempt or check fails this function will short-circuit and return an error which will be ignored.
-   */
-  private def sendAcknowledgment(streamChunk: (Option[SocketAddress], CoapMessage)) =
-    streamChunk match {
-      case (address, msg) => {
-        IO.fromOption(address).orElseFail(MissingAddress) <*>
-          IO.cond(msg.isConfirmable, getAcknowledgment(msg), NoResponseAvailable) >>=
-            { case (address, acknowledgment) => sendMessage(address, acknowledgment) }
-      }.ignore
-    }
-  // TODO: ABOVE SHOULD PUSH THE MISSING ADDRESS TO AN OUTER COLLECT!
-  /**
-   * If the CoapMessage was unsuccessfully parsed but contains a CoapId and the origin is known, this function
-   * will send a reset message to the message's origin. If the parsing was successful or the address is missing,
-   * this function will do nothing.
-   * @param streamChunk A tuple that might contain a SocketAddress and will either contain a CoapMessage or
-   *                    its parsing error combined with the recovered CoapId.
-   */
-  private def sendReset(streamChunk: (Option[SocketAddress], Either[(GatewayError, CoapId), CoapMessage])) =
-    streamChunk match {
-      case (address, either) => either match {
-        case Left(value) =>
-          val msg = ResponseService.getResetMessage(value)
-          IO.fromOption(address).orElseFail(MissingAddress).flatMap(sendMessage(_, msg)).ignore
-        case Right(_)    => UIO.unit
-      }
-    }
-
-  /**
-   * Extracts the CoapMessage from the streamChunk tuple and thus drops the SocketAddress.
-   */
-  private def isolateMessage(tuple: (Option[SocketAddress], CoapMessage)) =
-    tuple._2
-
-  /**
-   * Drops all CoapMessages that do not contain the "PUT" code.
-   * */
-  private def sendableMessage: PartialValidMessage = {
-    case msg @ CoapMessage(header, _) if header.coapCodePrefix.value == 0 && header.coapCodeSuffix.value == 3 => msg
-  }
-  //TODO: ABOVE NEEDS TO CHECK FOR URI AND PAYLOAD!
-  /**
-   * Drops all unsuccessfully parsed CoapMessages.
-   */
-  private def validMessage: PartialGatherMessages = {
-    case (address, Right(message)) => (address, message)
-  }
-
-  /**
-   * Drops all unsuccessfully parsed CoapMessages that do not contain a recovered CoAP id.
-   */
-  private def messagesAndErrorsWithId: PartialRemoveEmptyID = {
-    case (address, Right(value))                    => (address, Right(value))
-    case (address, Left((err, id))) if id.isDefined => (address, Left(err, id.get))
-  }
-
+  private def isPut(msg: CoapMessage): IO[UnsharablePayload, Unit] =
+    IO.cond(
+      msg.header.coapCodePrefix.value == 0 && msg.header.coapCodeSuffix.value == 3,
+      (),
+      UnsharablePayload)
 }
 

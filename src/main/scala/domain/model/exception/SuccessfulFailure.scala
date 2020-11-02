@@ -37,5 +37,6 @@ case object UnsupportedPayload extends SuccessfulFailure {
 }
 
 case object UnsharablePayload extends SuccessfulFailure {
+  type UnsharablePayload = UnsharablePayload.type
   override def msg = "The message is not meant to be shared."
 }

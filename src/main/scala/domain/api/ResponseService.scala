@@ -8,7 +8,7 @@ import zio.Chunk
 
 object ResponseService {
 
-  def getAcknowledgment(msg: CoapMessage): Chunk[Byte] =
+  def getAckMessage(msg: CoapMessage): Chunk[Byte] =
     acknowledgeMessage(msg.header.coapId).toByteChunk
 
   def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
