@@ -36,7 +36,7 @@ object PublisherServer {
   private def operation(element: (Option[SocketAddress], Chunk[Byte])) =
     CoapDeserializerService.parseCoapMessageWithoutErr(element._2).flatMap {
       case Left(id) => attemptReset(element._1, id)
-      case Right(m) => attemptAcknowledgment(element._1, m).flatMap(duplicationCheck(m, _)) *> attemptPublish(m)
+      case Right(m) => attemptAcknowledgment(element._1, m).flatMap(duplicateCheck(m, _)) *> attemptPublish(m)
     }.ignore
 
   // TODO: MessageSenderRepository needs a service!
@@ -56,12 +56,13 @@ object PublisherServer {
    * otherwise the respective successful error is returned
    */
   private def attemptAcknowledgment(address: Option[SocketAddress], msg: CoapMessage) =
-    (address match {
+    address match {
       case None       => IO.fail(MissingAddress)
       case Some(addr) =>
-        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable)
-          .flatMap(sendMessage(addr, _)) *> IO.succeed(addr)
-    }).either
+        ZIO.when(msg.isConfirmable)(
+          IO.succeed(ResponseService.getAckMessage(msg)).flatMap(sendMessage(addr, _))
+        ) *> IO.succeed(addr)
+    }
 
   /**
    * If a message has a PUT code, an URI-path and a payload, the message will be published on the broker
@@ -74,9 +75,11 @@ object PublisherServer {
       _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.from(path, content))
     } yield ()).ignore
 
-  private def duplicationCheck(m: CoapMessage, addrE: Either[GatewayError, SocketAddress]) =
+  /**
+   * Checks whether a message from a given source is a duplicate. Fails if the message is a duplicate.
+   */
+  private def duplicateCheck(m: CoapMessage, addr: SocketAddress) =
     for {
-      addr  <- IO.fromEither(addrE)
       added <- DuplicateRejectionService.addAndDeleteAfter((addr, m.header.coapId))
       _     <- ZIO.unless(added)(ZIO.fail(Duplicate))
     } yield ()
