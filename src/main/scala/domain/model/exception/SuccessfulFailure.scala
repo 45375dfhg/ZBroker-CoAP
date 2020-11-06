@@ -40,3 +40,8 @@ case object UnsharablePayload extends SuccessfulFailure {
   type UnsharablePayload = UnsharablePayload.type
   override def msg = "The message is not meant to be shared."
 }
+
+case object Duplicate extends SuccessfulFailure {
+  type Duplicate = Duplicate.type
+  override def msg = "This message is a duplicate."
+}

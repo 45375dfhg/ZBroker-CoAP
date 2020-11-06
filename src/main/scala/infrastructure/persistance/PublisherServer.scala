@@ -74,13 +74,12 @@ object PublisherServer {
       _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.from(path, content))
     } yield ()).ignore
 
-  private def duplicationCheck(m: CoapMessage, addr: Either[GatewayError, SocketAddress]) =
+  private def duplicationCheck(m: CoapMessage, addrE: Either[GatewayError, SocketAddress]) =
     for {
-      a <- IO.fromEither(addr)
-      _ <- DuplicateRejectionService.addAndDeleteAfter((a, m.header.coapId))
+      addr  <- IO.fromEither(addrE)
+      added <- DuplicateRejectionService.addAndDeleteAfter((addr, m.header.coapId))
+      _     <- ZIO.unless(added)(ZIO.fail(Duplicate))
     } yield ()
-
-  // TODO: return token with acknowledge (and reset?)!
 
   /**
    * Checks the header of a message for its code - if the code is 0:3 (PUT) it returns true

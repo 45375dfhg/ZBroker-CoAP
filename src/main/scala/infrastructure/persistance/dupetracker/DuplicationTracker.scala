@@ -17,9 +17,12 @@ class DuplicationTracker[A] private (val fleeting: TSet[A]) extends DuplicationT
     STM.atomically {
       for {
         b <- fleeting.contains(element)
+        // _ <- STM.when(b)(STM.fail())
         _ <- STM.unless(b)(fleeting.put(element))
       } yield !b
     }
+
+  // TODO refactor this into two parts where one acts like a service while the other is "clean"
 
   /**
    * Removes an element from the set if it is included.

@@ -68,8 +68,9 @@ final case class CoapMessage(header: CoapHeader, body: CoapBody) { self =>
 }
 
 object CoapMessage {
-
+  // TODO: return token with acknowledge (and reset?)!
   def asResetWith(id : CoapId) = CoapMessage(CoapHeader.reset(id), CoapBody.empty)
+
   def asAckWith  (id : CoapId) = CoapMessage(CoapHeader.ack(id), CoapBody.empty)
 
   def fromDatagram(datagram: Chunk[Byte]): IO[GatewayError, CoapMessage] =
