@@ -36,7 +36,7 @@ object PublisherServer {
   private def operation(element: (Option[SocketAddress], Chunk[Byte])) =
     CoapDeserializerService.parseCoapMessageWithoutErr(element._2).flatMap {
       case Left(id) => attemptReset(element._1, id)
-      case Right(m) => attemptAcknowledgment(element._1, m) *> attemptPublish(m)
+      case Right(m) => attemptAcknowledgment(element._1, m).flatMap(duplicationCheck(m, _)) *> attemptPublish(m)
     }.ignore
 
   // TODO: MessageSenderRepository needs a service!
@@ -59,8 +59,8 @@ object PublisherServer {
     (address match {
       case None       => IO.fail(MissingAddress)
       case Some(addr) =>
-        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable).flatMap(sendMessage(addr, _)) *>
-        IO.succeed(addr)
+        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable)
+          .flatMap(sendMessage(addr, _)) *> IO.succeed(addr)
     }).either
 
   /**
@@ -73,6 +73,14 @@ object PublisherServer {
       content <- m.getContent
       _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.from(path, content))
     } yield ()).ignore
+
+  private def duplicationCheck(m: CoapMessage, addr: Either[GatewayError, SocketAddress]) =
+    for {
+      a <- IO.fromEither(addr)
+      _ <- DuplicateRejectionService.addAndDeleteAfter((a, m.header.coapId))
+    } yield ()
+
+  // TODO: return token with acknowledge (and reset?)!
 
   /**
    * Checks the header of a message for its code - if the code is 0:3 (PUT) it returns true

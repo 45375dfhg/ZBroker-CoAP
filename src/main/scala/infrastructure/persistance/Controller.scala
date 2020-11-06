@@ -1,10 +1,12 @@
 package infrastructure.persistance
 
+import domain.model.coap.header.fields.CoapId
 import domain.model.config.ConfigRepository
 import infrastructure.environment._
 import subgrpc.subscription.PublisherResponse
 import zio._
 import zio.console.putStrLn
+import zio.nio.core.SocketAddress
 
 object Controller {
 
@@ -20,7 +22,9 @@ object Controller {
    * Said layer is provided as parameter.
    */
   def getEnvironment(config: ULayer[Has[ConfigRepository.Service]]) =
-    BrokerRepositoryEnvironment.fromSTM[PublisherResponse] ++ (ZEnv.live >+> config >+> EndpointEnvironment.fromChannel) >+>
+    DuplicationTrackerRepositoryEnvironment.fromSTM[(SocketAddress, CoapId)] ++
+      BrokerRepositoryEnvironment.fromSTM[PublisherResponse] ++
+      (ZEnv.live >+> config >+> EndpointEnvironment.fromChannel) >+>
       (ChunkStreamRepositoryEnvironment.fromSocket ++ MessageSenderRepositoryEnvironment.fromSocket)
 
 }
