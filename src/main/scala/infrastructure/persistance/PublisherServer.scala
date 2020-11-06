@@ -59,8 +59,9 @@ object PublisherServer {
     (address match {
       case None       => IO.fail(MissingAddress)
       case Some(addr) =>
-        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable) >>= (sendMessage(addr, _))
-    }).ignore
+        IO.cond(msg.isConfirmable, ResponseService.getAckMessage(msg), NoResponseAvailable).flatMap(sendMessage(addr, _)) *>
+        IO.succeed(addr)
+    }).either
 
   /**
    * If a message has a PUT code, an URI-path and a payload, the message will be published on the broker

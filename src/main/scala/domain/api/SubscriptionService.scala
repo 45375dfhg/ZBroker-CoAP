@@ -48,7 +48,7 @@ object SubscriptionService {
     }))
   }
 
-  val nonEmptyPaths: PartialFunction[SubscriptionRequest, (SubscriptionRequest.Action, NonEmptyChunk[Path])] = {
+  val nonEmptyPaths: PathPartial = {
     case SubscriptionRequest(action, head +: tail, _) => (action, NonEmptyChunk.fromIterable(head, tail))
   }
 
@@ -59,5 +59,5 @@ object SubscriptionService {
     PartialFunction[(SubscriptionRequest.Action, NonEmptyChunk[Path]), (SubscriptionRequest.Action, NonEmptyChunk[NonEmptyChunk[String]])]
 
   type PathPartial =
-    PartialFunction[(SubscriptionRequest.Action, NonEmptyChunk[Path]), (SubscriptionRequest.Action, NonEmptyChunk[Path])]
+    PartialFunction[SubscriptionRequest, (SubscriptionRequest.Action, NonEmptyChunk[Path])]
 }

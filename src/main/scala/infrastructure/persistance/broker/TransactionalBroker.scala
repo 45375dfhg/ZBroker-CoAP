@@ -79,7 +79,7 @@ class TransactionalBroker[R] private (
       for {
         bool  <- mailboxes.contains(id)
         _     <- if (bool) STM.unit else STM.retry
-        queue <- mailboxes.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)
+        queue <- mailboxes.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket) // TQueue.unbounded[R] >>= (q => mailboxes.getOrElse(id, q))
       } yield queue
     }
   }

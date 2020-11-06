@@ -55,6 +55,6 @@ object BrokerSpec extends DefaultRunnableSpec {
             b <- BrokerRepository.getNextId[PublisherResponse]
           } yield assert(a)(isLessThan(b))
         }
-      )
+      ) // TODO: add object function tests too!
     ).provideCustomLayer(testEnvironment)
 }
