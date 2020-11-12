@@ -6,7 +6,6 @@ import zio.console.Console
 import zio.{Chunk, Has, ZIO}
 import zio.nio.core.SocketAddress
 
-// TODO Remove Console from Environment
 object MessageSenderRepository {
 
   type MessageSenderRepository = Has[MessageSenderRepository.Service]
@@ -15,7 +14,9 @@ object MessageSenderRepository {
     def sendMessage(to: SocketAddress, msg: Chunk[Byte]): ZIO[Channel with Console, GatewayError, Unit]
   }
 
-  def sendMessage(to: SocketAddress, msg: Chunk[Byte]
+  def sendMessage(
+    to: SocketAddress,
+    msg: Chunk[Byte]
   ): ZIO[MessageSenderRepository with Channel with Console, GatewayError, Unit] =
     ZIO.accessM(_.get.sendMessage(to, msg))
 }

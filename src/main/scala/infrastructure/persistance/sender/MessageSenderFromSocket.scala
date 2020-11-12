@@ -15,6 +15,5 @@ object MessageSenderFromSocket extends MessageSenderRepository.Service {
       buffer  <- Buffer.byte(msg)
       server  <- ZIO.service[DatagramChannel]
       _       <- server.send(buffer, to)
-      //_       <- putStrLn(to.toString + " -- " + msg.toString)
-    } yield ()).refineOrDieWith(PartialFunction.empty)(_ => new Throwable("dead")) // TODO: REFINE PROPERLY
+    } yield ()).refineOrDieWith(PartialFunction.empty)(_ => new Throwable())
 }

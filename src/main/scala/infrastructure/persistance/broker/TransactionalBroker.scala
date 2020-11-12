@@ -70,7 +70,7 @@ class TransactionalBroker[R] private (
   /**
    * Attempts to get the mailbox (a queue) mapped to the specified ID.
    * <p>
-   * TODO: WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
+   * WARNING: MULTIPLE EXTRACTIONS AND CONSUMPTIONS ARE NOT CHECKED FOR.
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */

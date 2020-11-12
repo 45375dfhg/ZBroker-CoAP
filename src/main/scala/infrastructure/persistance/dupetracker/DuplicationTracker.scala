@@ -13,16 +13,13 @@ class DuplicationTracker[A] private (val fleeting: TSet[A]) extends DuplicationT
    * @param element An element of A which is to be added to the fleeting TSet[A].
    * @return A Boolean that represents whether the element was added to the TSet. true means it was added.
    */
-  def add(element: A): UIO[Boolean] =
+  def addIf(element: A): UIO[Boolean] =
     STM.atomically {
       for {
         b <- fleeting.contains(element)
-        // _ <- STM.when(b)(STM.fail())
         _ <- STM.unless(b)(fleeting.put(element))
       } yield !b
     }
-
-  // TODO refactor this into two parts where one acts like a service while the other is "clean"
 
   /**
    * Removes an element from the set if it is included.
@@ -47,6 +44,11 @@ class DuplicationTracker[A] private (val fleeting: TSet[A]) extends DuplicationT
 
 object DuplicationTracker {
 
+  /**
+   * Custom constructor - this enforces non-shared, emptry TSets!
+   * @tparam A The generic which symbolized the message identifier.
+   *           The identifier is usually a tuple that contains the SocketAddress and the CoapId of a request!
+   */
   def make[A]: USTM[DuplicationTracker[A]] =
     for {
       fleeting <- TSet.empty[A]

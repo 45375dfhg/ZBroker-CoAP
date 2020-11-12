@@ -1,26 +1,19 @@
 package domain.api
 
-
 import domain.model.coap._
+import domain.model.coap.body.CoapToken
 import domain.model.coap.header.fields._
 import utility.PartialTypes._
 import zio.Chunk
 
-//TODO: refactor?
 object ResponseService {
 
-  def getAckMessage(msg: CoapMessage): Chunk[Byte] =
-    acknowledgeMessage(msg.header.coapId).toByteChunk
+  def constructAckFrom(msg: CoapMessage): Chunk[Byte] =
+    CoapMessage.asAckFrom(msg).toByteChunk
 
-  def getResetMessage(msg: IgnoredMessageWithId): Chunk[Byte] =
-    resetMessage(msg._2).toByteChunk
+  def constructResetFrom(id: CoapId): Chunk[Byte] =
+    CoapMessage.asResetWith(id).toByteChunk
 
-  def getResetMessage(id: CoapId): Chunk[Byte] =
-    resetMessage(id).toByteChunk
-
-  private def resetMessage(id: CoapId): CoapMessage =
-    CoapMessage.asResetWith(id)
-
-  private def acknowledgeMessage(id: CoapId): CoapMessage =
-    CoapMessage.asAckWith(id)
+  def constructResetWith(id: CoapId, token: CoapToken): Chunk[Byte] =
+    ???
 }

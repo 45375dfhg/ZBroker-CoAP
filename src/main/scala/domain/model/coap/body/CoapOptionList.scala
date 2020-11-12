@@ -15,12 +15,11 @@ final case class CoapOptionList(value: NonEmptyChunk[CoapOption]) extends AnyVal
       acc + c.coapOptionDelta.offset + c.coapOptionLength.offset + c.coapOptionLength.value + 1
     }
 
-  // TODO: Wrong place?
   def payloadMediaType: CoapPayloadMediaType =
     value.find(_.coapOptionNumber.value == 12) match {
       case Some(element) => element.coapOptionValue.content match {
         case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
-        case _                             => SniffingMediaType // TODO: Technically this is unexpected parsing error!
+        case _                             => SniffingMediaType // technically this is unexpected parsing error!
       }
       case None => SniffingMediaType
     }

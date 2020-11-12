@@ -39,14 +39,13 @@ object PublisherServer {
       case Right(m) => attemptAcknowledgment(element._1, m).flatMap(duplicateCheck(m, _)) *> attemptPublish(m)
     }.ignore
 
-  // TODO: MessageSenderRepository needs a service!
   /**
    * Attempts to send a reset message if the origin's socket address is defined and a message id was
    * successfully recovered from the datagram - else the respective successful error is returned
    */
   private def attemptReset(address: Option[SocketAddress], id: Option[CoapId]) =
     ((address, id) match {
-      case (Some(addr), Some(id)) => MessageSenderRepository.sendMessage(addr, ResponseService.getResetMessage(id))
+      case (Some(addr), Some(id)) => MessageSenderRepository.sendMessage(addr, ResponseService.constructResetFrom(id))
       case (None, _)              => IO.fail(MissingAddress)
       case (Some(_), None)        => IO.fail(MissingCoapId)
     }).ignore
@@ -60,7 +59,7 @@ object PublisherServer {
       case None       => IO.fail(MissingAddress)
       case Some(addr) =>
         ZIO.when(msg.isConfirmable)(
-          IO.succeed(ResponseService.getAckMessage(msg)).flatMap(sendMessage(addr, _))
+          IO.succeed(ResponseService.constructAckFrom(msg)).flatMap(sendMessage(addr, _))
         ) *> IO.succeed(addr)
     }
 
@@ -72,7 +71,7 @@ object PublisherServer {
       _       <- hasPutMessageCode(m)
       path    <- m.getPath
       content <- m.getContent
-      _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.from(path, content))
+      _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.fromPathWith(path, content))
     } yield ()).ignore
 
   /**
@@ -80,7 +79,7 @@ object PublisherServer {
    */
   private def duplicateCheck(m: CoapMessage, addr: SocketAddress) =
     for {
-      added <- DuplicateRejectionService.addAndDeleteAfter((addr, m.header.coapId))
+      added <- DuplicateRejectionService.temporaryAdd((addr, m.header.coapId))
       _     <- ZIO.unless(added)(ZIO.fail(Duplicate))
     } yield ()
 

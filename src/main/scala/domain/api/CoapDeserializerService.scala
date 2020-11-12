@@ -8,7 +8,6 @@ import zio._
 
 object CoapDeserializerService {
 
-  // TODO: A BIT EMPTY HERE
   def parseCoapMessage(chunk: Chunk[Byte]): UIO[Either[(GatewayError, Option[CoapId]), CoapMessage]] =
     CoapMessage.fromDatagram(chunk).flatMapError(err => UIO.succeed(err) <*> CoapId.recoverFrom(chunk)).either
 

@@ -34,6 +34,13 @@ object CoapBody {
       payload  <- CoapPayload.fromWithExcluding(body, CoapPayloadMediaType.fromOption(options), offset)
     } yield CoapBody(token, options, payload)
 
+  /**
+   * Creates a CoapBody that copies a requests optional token but besides that is empty.
+   * This is used to construct responses (without piggy-backing)
+   */
+  def asEmptyResponse(tokenO: Option[CoapToken]) =
+    CoapBody(tokenO, None, None)
+
   val empty = CoapBody(None, None, None)
 }
 

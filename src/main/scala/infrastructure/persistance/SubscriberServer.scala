@@ -1,6 +1,5 @@
 package infrastructure.persistance
 
-
 import domain.api.SubscriptionService
 import domain.model.broker.BrokerRepository._
 import io.grpc.ServerBuilder
@@ -10,10 +9,9 @@ import subgrpc.subscription.PublisherResponse
 import zio._
 import zio.console.putStrLn
 
-// TODO: This needs to proper generalized constructor
 object SubscriberServer {
 
-  def port = 8980 // TODO: Needs to be part of the config
+  def port = 8980
 
   def subscriptionService = new SubscriptionService()
 

@@ -23,7 +23,7 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
         BrokerRepository.getQueue[PR](id).bimap(
           _ => Status.INTERNAL,
           q => ZStream.fromTQueue(q).ensuring(BrokerRepository.removeSubscriber[PR](id).ignore))
-      ).drainFork { // TODO: Really just drop elements?
+      ).drainFork {
           request.collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized).tap {
             case (action, paths) => action match {
               case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)

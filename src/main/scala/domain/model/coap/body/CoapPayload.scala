@@ -16,7 +16,6 @@ abstract class CoapPayload {
   }
 }
 
-// TODO: REFACTOR THE APPLY METHODS TO RETURN AN EITHER?!
 final case class TextCoapPayload private(value: String) extends CoapPayload
 
 object TextCoapPayload {
@@ -25,10 +24,6 @@ object TextCoapPayload {
 }
 
 final case class UnknownPayload (value: Chunk[Byte]) extends CoapPayload
-
-// TODO: Implement the other Media Types
-// This might not be necessary as long as data is just passed!
-// A downstream participants could and probably should simply parse the data by themselves
 
 object CoapPayload {
 
@@ -81,7 +76,7 @@ object CoapPayloadMediaType {
       coapOptionList.value.find(_.coapOptionNumber.value == 12) match {
         case Some(element) => element.coapOptionValue.content match {
           case c : IntCoapOptionValueContent => CoapPayloadMediaType.fromInt(c.value)
-          case _                             => SniffingMediaType // TODO: Technically this is unexpected parsing error!
+          case _                             => SniffingMediaType // technically this is unexpected parsing error!
         }
       case None => SniffingMediaType
     }

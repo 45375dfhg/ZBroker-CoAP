@@ -9,7 +9,6 @@ import zio._
 
 object EndpointEnvironment {
 
-  // TODO: NOT TOO PRETTY
   val fromChannel: ZLayer[ConfigRepository with Console, GatewayError, Channel] =
     ZLayer.fromAcquireRelease(EndpointFromSocket.datagramChannel)(channel => UIO(channel.close))
 }

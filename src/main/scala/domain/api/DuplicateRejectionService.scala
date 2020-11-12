@@ -17,7 +17,7 @@ object DuplicateRejectionService {
    * @return A Boolean value which represents whether an element was added (and removed).
    *         true means it was added and WILL be removed (after n-seconds).
    */
-  def addAndDeleteAfter[A: Tag](element: A, n: Int = 145): URIO[DuplicationTrackerRepository[A] with Clock, Boolean] =
+  def temporaryAdd[A: Tag](element: A, n: Int = 145): URIO[DuplicationTrackerRepository[A] with Clock, Boolean] =
     for {
       b <- DuplicationTrackerRepository.add(element)
       _ <- ZIO.when(b)(DuplicationTrackerRepository.remove(element).delay(n.seconds).fork)

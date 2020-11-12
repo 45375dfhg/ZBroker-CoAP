@@ -45,9 +45,9 @@ package object fields {
     private def extend(coapOptionDelta: CoapOptionDelta, body: Chunk[Byte]): IO[GatewayError, CoapOptionDelta] =
       coapOptionDelta.value match {
         case basic if 0 to 12 contains basic => IO.succeed(coapOptionDelta)
-        case 13 => body.takeExactly(1).map(_.head) >>= (n => CoapOptionDelta(n + 13)) // TODO: head.toInt?
+        case 13 => body.takeExactly(1).map(_.head) >>= (n => CoapOptionDelta(n + 13))
         case 14 => body.takeExactly(2).map(merge)  >>= (n => CoapOptionDelta(n + 269))
-        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+        case _  => IO.fail(UnreachableCodeError)
       }
   }
 
@@ -81,9 +81,9 @@ package object fields {
     private def extend(coapOptionLength: CoapOptionLength, body: Chunk[Byte], offset: Int): IO[GatewayError, CoapOptionLength] =
       coapOptionLength.value match {
         case basic if 0 to 12 contains basic => IO.succeed(coapOptionLength)
-        case 13 => body.dropExactly(offset).flatMap(_.takeExactly(1)).map(_.head) >>= (n => CoapOptionLength(n + 13)) // TODO: head.toInt?
+        case 13 => body.dropExactly(offset).flatMap(_.takeExactly(1)).map(_.head) >>= (n => CoapOptionLength(n + 13))
         case 14 => body.dropExactly(offset).flatMap(_.takeExactly(2)).map(merge)  >>= (n => CoapOptionLength(n + 269))
-        case _  => IO.fail(UnreachableCodeError) // TODO: Rethink this error!
+        case _  => IO.fail(UnreachableCodeError)
       }
   }
 
@@ -100,7 +100,7 @@ package object fields {
       case v if 0   to 12    contains v => Chunk.empty
       case v if 13  to 268   contains v => Chunk((v - 13).toByte)
       case v if 269 to 65804 contains v => Chunk((((v - 269) >> 8) & 0xFF).toByte, ((v - 269) & 0xFF).toByte)
-      case _                            => Chunk.empty // TODO: value can't be higher than 65804 or lower than 0!
+      case _                            => Chunk.empty // value can't be higher than 65804 or lower than 0!
     }
 
   @newtype class CoapOptionNumber private(val value: Int) {
@@ -240,7 +240,6 @@ package object fields {
 
   object IntCoapOptionValueContent {
     def apply(raw: Chunk[Byte], range: Range): CoapOptionValueContent = {
-      // TODO: Rework model as ZIO => Buffer.byte(raw.leftPadTo(4, 0.toByte)).map(_.getInt))
       if (range contains raw.size)
         new IntCoapOptionValueContent(ByteBuffer.wrap(raw.leftPadTo(4, 0.toByte).toArray).getInt)
       else UnrecognizedValueContent
@@ -266,13 +265,13 @@ package object fields {
   case object UnrecognizedValueContent    extends CoapOptionValueContent
   case object EmptyCoapOptionValueContent extends CoapOptionValueContent
 
-  // TODO: Not in-use yet
+  // not in-use yet
   @newtype case class Critical(value: Boolean)
   @newtype case class Unsafe(value: Boolean)
   @newtype case class NoCacheKey(value: Boolean)
   @newtype case class Repeatable(value: Boolean)
 
-  // TODO: Refactor this and other cases into its own utility package
+  // maybe refactor this and other cases into its own utility package
   /**
    * A small helper functions that takes a Chunk[Byte] and merges the first two Bytes into an Int
    * There is no previous check on the index access validity so an unhandled error is possible.
