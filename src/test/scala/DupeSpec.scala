@@ -71,7 +71,41 @@ object DupeSpec extends DefaultRunnableSpec {
         }
       ),
       suite("DuplicationRejection ID")(
-        suite("DuplicateRejectionService")(
+        suite("DuplicationTracker ID")(
+          testM("addIf once") {
+            for {
+              i <- CoapId(15)
+              s <- SocketAddress.inetSocketAddress(8080)
+              _ <- DuplicationTrackerRepository.addIf[ID]((s,i))
+              s <- DuplicationTrackerRepository.size[ID]
+            } yield assert(s)(equalTo(1))
+          },
+          testM("addIf same element twice") {
+            for {
+              i <- CoapId(15)
+              s <- SocketAddress.inetSocketAddress(8080)
+              _ <- DuplicationTrackerRepository.addIf[ID]((s,i))
+              _ <- DuplicationTrackerRepository.addIf[ID]((s,i))
+              s <- DuplicationTrackerRepository.size[ID]
+            } yield assert(s)(equalTo(1))
+          },
+          testM("addIf once bool") {
+            for {
+              i <- CoapId(15)
+              s <- SocketAddress.inetSocketAddress(8080)
+              b <- DuplicationTrackerRepository.addIf[ID]((s,i))
+            } yield assert(b)(equalTo(true))
+          },
+          testM("addIf twice bool") {
+            for {
+              i <- CoapId(15)
+              s <- SocketAddress.inetSocketAddress(8080)
+              _ <- DuplicationTrackerRepository.addIf[ID]((s,i))
+              b <- DuplicationTrackerRepository.addIf[ID]((s,i))
+            } yield assert(b)(equalTo(false))
+          },
+        ),
+        suite("DuplicateRejectionService ID")(
           testM("temporaryAdd adds") {
             for {
               i <- CoapId(15)
