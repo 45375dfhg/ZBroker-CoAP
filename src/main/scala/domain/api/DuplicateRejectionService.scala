@@ -19,7 +19,7 @@ object DuplicateRejectionService {
    */
   def temporaryAdd[A: Tag](element: A, n: Int = 145): URIO[DuplicationTrackerRepository[A] with Clock, Boolean] =
     for {
-      b <- DuplicationTrackerRepository.add(element)
+      b <- DuplicationTrackerRepository.addIf(element)
       _ <- ZIO.when(b)(DuplicationTrackerRepository.remove(element).delay(n.seconds).fork)
     } yield b
 

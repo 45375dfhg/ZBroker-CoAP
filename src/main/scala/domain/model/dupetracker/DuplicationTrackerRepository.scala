@@ -12,7 +12,7 @@ object DuplicationTrackerRepository {
     def size: UIO[Int]
   }
 
-  def add[A: Tag](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
+  def addIf[A: Tag](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
     ZIO.accessM(_.get.addIf(element))
 
   def remove[A: Tag](element: A): URIO[DuplicationTrackerRepository[A], Boolean] =
