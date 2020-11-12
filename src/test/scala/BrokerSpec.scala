@@ -1,9 +1,9 @@
 
 import domain.model.broker.BrokerRepository
 import infrastructure.environment.BrokerRepositoryEnvironment
+import infrastructure.persistance.broker.TransactionalBroker
 import subgrpc.subscription.PublisherResponse
 import zio.NonEmptyChunk
-
 import zio.test._
 import zio.test.Assertion._
 
@@ -83,6 +83,6 @@ object BrokerSpec extends DefaultRunnableSpec {
             b <- BrokerRepository.getNextId[PR]
           } yield assert(a)(isLessThan(b))
         }
-      ) // TODO: add object function tests too!
+      )
     ).provideCustomLayer(testEnvironment)
 }
