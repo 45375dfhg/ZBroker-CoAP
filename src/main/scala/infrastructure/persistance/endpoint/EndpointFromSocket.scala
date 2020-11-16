@@ -19,7 +19,7 @@ object EndpointFromSocket {
       server        <- DatagramChannel.open
       _             <- server.bind(socketAddress)
     } yield server).refineOrDie {
-      case ex : IOException =>SystemError("Failure creating endpoint", ex)
+      case ex : IOException => SystemError("Failure creating endpoint", ex)
     }
 
 }

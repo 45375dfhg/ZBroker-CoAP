@@ -1,7 +1,6 @@
 
 import domain.model.broker.BrokerRepository
 import infrastructure.environment.BrokerRepositoryEnvironment
-import infrastructure.persistance.broker.TransactionalBroker
 import subgrpc.subscription.PublisherResponse
 import zio.NonEmptyChunk
 import zio.test._
