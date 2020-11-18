@@ -26,9 +26,9 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
       ).drainFork {
           request.collect(nonEmptyPaths andThen nonEmptySegments andThen notUnrecognized).tap {
             case (action, paths) => action match {
-              case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
-              case Action.REMOVE => BrokerRepository.removeSubscriptions(paths, id)
-            }
+                case Action.ADD    => BrokerRepository.addSubscriberTo(paths, id)
+                case Action.REMOVE => BrokerRepository.removeSubscriptions(paths, id)
+              }
           }
         }
     }

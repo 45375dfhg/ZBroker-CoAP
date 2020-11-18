@@ -17,7 +17,7 @@ object SubscriberServer {
 
   def service: ServiceList[ZEnv with BrokerRepository[PublisherResponse]] = ServiceList.add(subscriptionService)
 
-  def builder: ServerBuilder[_] = ServerBuilder.forPort(8980)
+  def builder: ServerBuilder[_] = ServerBuilder.forPort(8970)
 
   def live: ZLayer[ZEnv with BrokerRepository[PublisherResponse], Throwable, Has[Server.Service]] = ServerLayer.fromServiceList(builder, service)
 

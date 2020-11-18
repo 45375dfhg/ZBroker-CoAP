@@ -11,7 +11,7 @@ PB.targets in Compile := Seq(
     scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value,
 )
 
-val zioVersion = "1.0.1"
+val zioVersion = "1.0.3"
 
 val zio = Seq(
     "dev.zio" %% "zio"         % zioVersion,
@@ -24,7 +24,7 @@ val zio_nio = Seq(
 )
 
 val zio_grpc = Seq(
-    "io.grpc" % "grpc-netty" % "1.31.1",
+    "io.grpc" % "grpc-netty" % "1.33.1", // 1.31.1
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion,
 )
 
