@@ -20,6 +20,7 @@ object BrokerRepository {
     def getSubscribers(topic: Segments): UIO[Option[Set[Long]]]
     def removeSubscriptions(topics: Paths, id: Long): UIO[Unit]
     def getNextId: UIO[Long]
+    def getTopics: UIO[List[String]]
 
     def subscriptionSizeOf(key: String): UIO[Int]
     def subscriberElements(key: Long): UIO[Int]
@@ -87,4 +88,7 @@ object BrokerRepository {
 
   def sizeCounter[R: Tag]: URIO[BrokerRepository[R], Long] =
     ZIO.accessM(_.get.sizeCounter)
+
+  def getTopics[R: Tag]: URIO[BrokerRepository[R], List[String]] =
+    ZIO.accessM(_.get.getTopics)
 }

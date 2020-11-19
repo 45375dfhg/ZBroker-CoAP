@@ -154,6 +154,10 @@ class TransactionalBroker[R] private (
       } yield ()
     }
 
+  val getTopics: UIO[List[String]] =
+    subscriptions.keys.commit
+
+
   /*
    * The following functions provide access to different lengths and sizes of the Broker.
    * These functions primarily exist for testing.
@@ -162,10 +166,10 @@ class TransactionalBroker[R] private (
   def subscriberElements(key: Long): UIO[Int]   = subscribers.get(key).map(_.size).commit
   def mailboxOf(key: Long): UIO[Int] = mailboxes.get(key).flatMap(_.fold(STM.succeed(0))(_.size)).commit
 
-  def sizeMailboxes     = mailboxes.size.commit
-  def sizeSubscriptions = subscriptions.size.commit
-  def sizeSubscribers   = subscribers.size.commit
-  def sizeCounter       = counter.get.commit
+  val sizeMailboxes     = mailboxes.size.commit
+  val sizeSubscriptions = subscriptions.size.commit
+  val sizeSubscribers   = subscribers.size.commit
+  val sizeCounter       = counter.get.commit
 }
 
 object TransactionalBroker {

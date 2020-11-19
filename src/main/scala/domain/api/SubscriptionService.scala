@@ -3,9 +3,9 @@ package domain.api
 import domain.model.broker.BrokerRepository
 import domain.model.broker.BrokerRepository._
 
-import subgrpc.subscription.SubscriptionRequest._
-import subgrpc.subscription.ZioSubscription._
 import subgrpc.subscription._
+import subgrpc.subscription.ZioSubscription._
+import subgrpc.subscription.SubscriptionRequest._
 
 import io.grpc._
 
@@ -34,6 +34,7 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
     }
   }
 
+  override def getTopics(request: Empty) = ???
 }
 
 object SubscriptionService {
@@ -43,7 +44,7 @@ object SubscriptionService {
   }
 
   val nonEmptySegments: SegmentPartial = {
-    case (a, paths) if paths.forall(_.segments.nonEmpty) => (a, paths.map(_.segments match {
+    case (a, paths) if paths.forall(_.segment.nonEmpty) => (a, paths.map(_.segment match {
       case head +: tail => NonEmptyChunk.fromIterable(head, tail)
     }))
   }

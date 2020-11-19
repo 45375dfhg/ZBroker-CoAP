@@ -3,11 +3,15 @@ syntax = "proto3";
 package subgrpc;
 
 service SubscriptionService {
+
   rpc Subscribe(stream SubscriptionRequest) returns (stream PublisherResponse);
+
+  rpc GetTopics(Empty) returns (stream Path);
+
 }
 
 /* A SubscriptionRequest is a message sent to subscribe or unsubscribe
- * to one or many endpoints of one or many sensors.
+ * to 1..n paths where each path is a topic by itself.
  *
  * The action will be matched to either add or remove one or many subscriptions. */
 
@@ -27,7 +31,7 @@ message SubscriptionRequest {
 /* A response to a SubscriptionRequest.
  * It contains an identifier to match the response
  * to a subscription, if necessary. The meat of
- * response is a repeated string, usually one. */
+ * response is a string. */
 
 message PublisherResponse {
 
@@ -46,5 +50,7 @@ message PublisherResponse {
  * THIS WOULD MATCH AGAINST A SUBSCRIPTION TO THE WHOLE BROKER WHICH IS NOT ALLOWED. */
 
 message Path {
-  repeated string segments = 1;
+  repeated string segment = 1;
 }
+
+message Empty {}
