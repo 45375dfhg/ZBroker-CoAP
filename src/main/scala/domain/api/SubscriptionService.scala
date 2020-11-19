@@ -15,8 +15,12 @@ import zio._
 class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepository[PublisherResponse], Any] {
   import SubscriptionService._
 
-  override def subscribe(request: Stream[Status, SubscriptionRequest]): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, PublisherResponse] = {
-    type PR = PublisherResponse
+  type PR = PublisherResponse
+
+  override def subscribe(
+    request: Stream[Status, SubscriptionRequest]
+  ): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, PublisherResponse] = {
+
 
     ZStream.fromEffect(BrokerRepository.getNextId[PR]).flatMap { id =>
       ZStream.unwrap(
@@ -34,7 +38,12 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
     }
   }
 
-  override def getTopics(request: Empty) = ???
+  override def getTopics(request: Empty): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, Path] = {
+    // Path.fromAscii()
+
+    ZStream.fromIterableM(BrokerRepository.getTopics[PR] )
+  }
+
 }
 
 object SubscriptionService {
