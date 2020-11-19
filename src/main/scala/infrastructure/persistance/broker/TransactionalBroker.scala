@@ -178,13 +178,16 @@ object TransactionalBroker {
    * Takes the segments which make up a path and returns their sub-routes.
    */
   private def getSubPaths(segments: Segments): Seq[String] =
-    segments.scanLeft("")(_ + _).tail
+    cleanSegments(segments).scanLeft("")(_ + "/" + _).tail
 
   /**
    * Takes segments which make up a path and returns the complete path as a String.
    */
   private def getPathFromSegments(uriPath: Segments): String =
-    uriPath.mkString
+    cleanSegments(uriPath).mkString("/")
+
+  private def cleanSegments(segments: Segments): Chunk[String] =
+    segments.map(_.filterNot(_ == '/')).filterNot(_.isEmpty)
 
   /**
    * Creates a STM of a TransactionalBroker.

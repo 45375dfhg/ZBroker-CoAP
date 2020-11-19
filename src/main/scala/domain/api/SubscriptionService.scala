@@ -38,11 +38,15 @@ class SubscriptionService extends ZSubscriptionService[ZEnv with BrokerRepositor
     }
   }
 
-  override def getTopics(request: Empty): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, Path] = {
-    // Path.fromAscii()
+  override def getTopics(request: Empty): ZStream[ZEnv with BrokerRepository[PublisherResponse], Status, Path] =
+    ZStream.fromIterableM {
+      BrokerRepository.getTopics[PR].map { list =>
+        list.map(t => Path(splitTopicsIntoSegments(t)))
+      }
+    }
 
-    ZStream.fromIterableM(BrokerRepository.getTopics[PR] )
-  }
+  private def splitTopicsIntoSegments(topic: String) =
+    topic.split('/')
 
 }
 
