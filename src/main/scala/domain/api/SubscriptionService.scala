@@ -57,7 +57,7 @@ object SubscriptionService {
   }
 
   val nonEmptySegments: SegmentPartial = {
-    case (a, paths) if paths.forall(_.segment.nonEmpty) => (a, paths.map(_.segment match {
+    case (a, paths) if paths.forall(_.segments.nonEmpty) => (a, paths.map(_.segments match {
       case head +: tail => NonEmptyChunk.fromIterable(head, tail)
     }))
   }

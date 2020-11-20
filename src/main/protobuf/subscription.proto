@@ -50,7 +50,7 @@ message PublisherResponse {
  * THIS WOULD MATCH AGAINST A SUBSCRIPTION TO THE WHOLE BROKER WHICH IS NOT ALLOWED. */
 
 message Path {
-  repeated string segment = 1;
+  repeated string segments = 1;
 }
 
 message Empty {}

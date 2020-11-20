@@ -72,6 +72,7 @@ object PublisherServer {
       path    <- m.getPath
       content <- m.getContent
       _       <- BrokerRepository.pushMessageTo(path, PublisherResponse.fromPathWith(path, content))
+      _       <- BrokerRepository.addTopic[PublisherResponse](path)
     } yield ()).ignore
 
   /**
