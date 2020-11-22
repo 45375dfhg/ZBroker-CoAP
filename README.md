@@ -1,3 +1,4 @@
-# BA Thesis Project: IoT-gateway
+# BA Thesis Project: ZIO Message Broker
 
-Design and Implementation of an Architecture for a Functional, Streaming, CoAP-Based IoT Gateway for Large Scale Networks Using ZIO
+Design and Implementation of an Architecture for a Functional, Streaming Message Broker for CoAP-Publishers and gRPC-Subscribers Using ZIO
+
