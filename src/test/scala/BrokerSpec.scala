@@ -19,27 +19,27 @@ object BrokerSpec extends DefaultRunnableSpec {
         testM("add subscriber") {
           for {
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
-            s <- BrokerRepository.getSubscribers[PR]("rootnodeleaf").map(a => a.fold(-1)(_.size))
+            s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(1))
         },
         testM("add same subscriber twice") {
           for {
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L).repeatN(2)
-            s <- BrokerRepository.getSubscribers[PR]("rootnodeleaf").map(a => a.fold(-1)(_.size))
+            s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(1))
         },
         testM("add two different subscriber to same topic") {
           for {
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 2L)
-            s <- BrokerRepository.getSubscribers[PR]("rootnodeleaf").map(a => a.fold(-1)(_.size))
+            s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(2))
         },
         testM("remove subscriber") {
           for {
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
             _ <- BrokerRepository.removeSubscriber[PR](1L)
-            s <- BrokerRepository.getSubscribers[PR]("rootnodeleaf").map(a => a.fold(-1)(_.size))
+            s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(0))
         }
       ),
@@ -48,7 +48,7 @@ object BrokerSpec extends DefaultRunnableSpec {
           for {
             _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
             _ <- BrokerRepository.removeSubscriber[PR](1L)
-            s <- BrokerRepository.getSubscribers[PR]("rootnodeleaf").map(a => a.fold(-1)(_.size))
+            s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(0))
         },
         testM("add subscriber") {

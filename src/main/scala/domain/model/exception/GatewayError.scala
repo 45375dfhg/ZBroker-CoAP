@@ -1,6 +1,6 @@
 package domain.model.exception
 
-// shout out to @Rudder
+// shoutout to @Rudder
 /**
  * This is the supertype exception for the whole application
  */
