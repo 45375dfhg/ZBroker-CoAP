@@ -11,6 +11,13 @@ PB.targets in Compile := Seq(
     scalapb.zio_grpc.ZioCodeGenerator -> (sourceManaged in Compile).value,
 )
 
+assemblyMergeStrategy in assembly := {
+    case x if x.contains("io.netty.versions.properties") => MergeStrategy.discard
+    case x =>
+        val oldStrategy = (assemblyMergeStrategy in assembly).value
+        oldStrategy(x)
+}
+
 val zioVersion = "1.0.3"
 
 val zio = Seq(
