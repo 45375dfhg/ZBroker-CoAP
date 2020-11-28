@@ -18,7 +18,7 @@ object BrokerSpec extends DefaultRunnableSpec {
       suite("topics")(
         testM("add subscriber") {
           for {
-            _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk(".well-known", "node", "leaf")), 1L)
+            _ <- BrokerRepository.addSubscriberTo[PR](NonEmptyChunk(NonEmptyChunk("root", "node", "leaf")), 1L)
             s <- BrokerRepository.getSubscribers[PR]("root/node/leaf").map(a => a.fold(-1)(_.size))
           } yield assert(s)(equalTo(1))
         },
