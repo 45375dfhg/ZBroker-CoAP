@@ -74,15 +74,14 @@ class TransactionalBroker[R] private (
    * @param id The connection ID, used as a key value to get the queue.
    * @return Either a TQueue as planned or an UnexpectedError which represents a very faulty system state.
    */
-  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[R]] = {
+  def getQueue(id: Long): IO[MissingBrokerBucket, TQueue[R]] =
     STM.atomically {
       for {
         bool  <- mailboxes.contains(id)
         _     <- if (bool) STM.unit else STM.retry
-        queue <- mailboxes.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket) // TQueue.unbounded[R] >>= (q => mailboxes.getOrElse(id, q))
+        queue <- mailboxes.get(id).flatMap(STM.fromOption(_)).mapError(_ => MissingBrokerBucket)
       } yield queue
     }
-  }
 
   /**
    * Pushes a message to all its related topic's subscribers by acquiring all subscribers from
@@ -178,7 +177,9 @@ object TransactionalBroker {
    * Takes the segments which make up a path and returns their sub-routes.
    */
   private def getSubPaths(segments: Segments): Seq[String] =
-    cleanSegments(segments).scanLeft("")(_ + "/" + _).tail
+    cleanSegments(segments).scanLeft("") { (acc, c) =>
+      if (acc.isBlank) c else acc + "/" + c
+    }.tail
 
   /**
    * Takes segments which make up a path and returns the complete path as a String.
